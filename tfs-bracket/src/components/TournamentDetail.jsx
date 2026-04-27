@@ -1,0 +1,178 @@
+import { db, doc, updateDoc } from "../firebase";
+import { generateBracket, advanceBracket, parseFirestoreDate, resetBracket } from "../utils/bracket";
+import { logEvent } from "../utils/logger";
+import BracketView from "./BracketView";
+
+export default function TournamentDetail({ tournament, tournaments, user, onBack, onUpdate }) {
+  const liveTournament = tournaments?.find((t) => t.id === tournament.id) || tournament;
+  const t = liveTournament;
+  
+  const isDev = import.meta.env.DEV;
+  const isAdmin = user.uid === t.adminId;
+  const now = new Date();
+  const regStartDate = parseFirestoreDate(t.regStart);
+  const regEndDate = parseFirestoreDate(t.regEnd);
+  const regOpen =
+    t.published &&
+    regStartDate &&
+    regEndDate &&
+    regStartDate <= now &&
+    regEndDate > now;
+  const canJoin =
+    regOpen &&
+    !t.participants.some((p) => p.id === user.uid) &&
+    t.participants.length < t.maxParticipants;
+
+  const handleJoin = async () => {
+    const ref = doc(db, "tournaments", t.id);
+    const newParticipant = { id: user.uid, name: user.displayName, email: user.email };
+    await updateDoc(ref, {
+      participants: [...t.participants, newParticipant],
+    });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: user.displayName } });
+  };
+
+  const handlePublish = async () => {
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { published: true });
+    onUpdate({ ...t, published: true });
+    logEvent({ action: "publish_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+  };
+
+  const handleStartTournament = async () => {
+    const matches = generateBracket(t.participants, t.maxParticipants);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches, started: true });
+    onUpdate({ ...t, matches, started: true });
+    logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length } });
+  };
+
+  const handleUpdateMatch = async (matchIndex, winnerIndex) => {
+    const match = t.matches[matchIndex];
+    const winner = winnerIndex === 0 ? match.player1 : match.player2;
+    const matches = advanceBracket(t.matches, matchIndex, winnerIndex);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches });
+    onUpdate({ ...t, matches });
+    logEvent({ action: "record_match_winner", details: { tournamentId: t.id, matchIndex, winner, round: match.round } });
+  };
+
+  const handleAddFakeUsers = async () => {
+    const fakeNames = [
+      "Player One", "Player Two", "Player Three", "Player Four",
+      "Player Five", "Player Six", "Player Seven", "Player Eight",
+    ];
+    const currentCount = t.participants.length;
+    const slotsAvailable = t.maxParticipants - currentCount;
+    const toAdd = fakeNames.slice(0, slotsAvailable).map((name, i) => ({
+      id: `fake-${currentCount + i}`,
+      name,
+      email: `${name.toLowerCase().replace(" ", "-")}@example.com`,
+    }));
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, {
+      participants: [...t.participants, ...toAdd],
+    });
+    onUpdate({ ...t, participants: [...t.participants, ...toAdd] });
+    logEvent({ action: "add_fake_users", details: { tournamentId: t.id, count: toAdd.length } });
+  };
+
+  const handleResetBracket = async () => {
+    if (!confirm("Are you sure you want to reset the bracket? All matches will be cleared.")) return;
+    const freshMatches = generateBracket(t.participants, t.maxParticipants);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches: freshMatches });
+    onUpdate({ ...t, matches: freshMatches });
+    logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
+  };
+
+  return (
+    <div className="tournament-detail">
+      <button className="btn-back" onClick={onBack}>
+        ← Back
+      </button>
+      <div className="detail-header">
+        <h2>{t.name}</h2>
+        {isAdmin && !t.published && (
+          <button className="btn-primary" onClick={handlePublish}>
+            Publish
+          </button>
+        )}
+      </div>
+
+      <div className="detail-info">
+        <p>
+          <strong>Admin:</strong> {t.adminName}
+        </p>
+        <p>
+          <strong>Registration:</strong>{" "}
+          {regStartDate ? regStartDate.toLocaleString() : "TBD"} -{" "}
+          {regEndDate ? regEndDate.toLocaleString() : "TBD"}
+        </p>
+        <p>
+          <strong>Status:</strong>{" "}
+          {t.started
+            ? "In Progress"
+            : t.published
+            ? "Open"
+            : "Draft"}
+        </p>
+      </div>
+
+      {!t.started && (
+        <div className="participants-section">
+          <h3>
+            Participants ({t.participants.length}/{t.maxParticipants})
+          </h3>
+          {t.participants.length === 0 ? (
+            <p className="empty">No participants yet</p>
+          ) : (
+            <ul className="participants-list">
+              {t.participants.map((p, i) => (
+                <li key={i}>
+                  {i + 1}. {p.name}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canJoin && (
+            <button className="btn-primary" onClick={handleJoin}>
+              Join Tournament
+            </button>
+          )}
+          {isDev && isAdmin && (
+              <button className="btn-secondary" onClick={handleAddFakeUsers}>
+                + Add Fake Users
+              </button>
+            )}
+            {isAdmin &&
+              t.published &&
+              t.participants.length >= 2 &&
+              !t.started && (
+                <button className="btn-primary" onClick={handleStartTournament}>
+                  Start Tournament
+                </button>
+              )}
+        </div>
+      )}
+
+      {t.started && t.matches && (
+        <>
+          <div className="bracket-actions">
+            {isAdmin && (
+              <button className="btn-secondary" onClick={handleResetBracket}>
+                Reset Bracket
+              </button>
+            )}
+          </div>
+          <BracketView
+            matches={t.matches}
+            onUpdateMatch={handleUpdateMatch}
+            isAdmin={isAdmin}
+          />
+        </>
+      )}
+    </div>
+  );
+}

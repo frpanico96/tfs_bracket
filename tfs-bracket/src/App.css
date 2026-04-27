@@ -251,6 +251,10 @@ body {
   padding: 16px 0;
 }
 
+.bracket-actions {
+  margin-bottom: 16px;
+}
+
 .round {
   min-width: 150px;
 }
@@ -269,6 +273,15 @@ body {
 
 .match.completed {
   background: #e8f5e9;
+}
+
+.match:has(.match-row:only-child) {
+  background: #fff;
+}
+
+.match.future {
+  opacity: 0.6;
+  background: #f0f0f0;
 }
 
 .match-row {
