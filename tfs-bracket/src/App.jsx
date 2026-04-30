@@ -70,7 +70,7 @@ function App() {
     <div className="app">
       <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
 
-      <main className="main">
+      <main className={`main ${view === "detail" ? "main-full" : ""}`}>
         {view === "list" && (
           <TournamentList
             tournaments={tournaments}

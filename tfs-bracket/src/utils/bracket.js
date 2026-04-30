@@ -25,6 +25,7 @@ export function generateBracket(participants, max) {
             isPlayed: false,
             prevMatch1: null,
             prevMatch2: null,
+            winCondition: "ft3",
           });
         } else {
           matches.push({
@@ -37,6 +38,7 @@ export function generateBracket(participants, max) {
             isPlayed: true,
             prevMatch1: null,
             prevMatch2: null,
+            winCondition: "ft3",
           });
         }
       } else {
@@ -51,6 +53,7 @@ export function generateBracket(participants, max) {
           isPlayed: false,
           prevMatch1: `r${r - 1}-m${prevMatchIndex}`,
           prevMatch2: `r${r - 1}-m${prevMatchIndex + 1}`,
+          winCondition: "ft3",
         });
       }
     }
@@ -79,13 +82,17 @@ export function parseFirestoreDate(dateValue) {
   return new Date(dateValue);
 }
 
-export function advanceBracket(matches, matchIndex, winnerIndex) {
+export function advanceBracket(matches, matchIndex, winnerIndex, scores) {
   const updatedMatches = matches.map(m => ({ ...m }));
   const match = updatedMatches[matchIndex];
   const currentRound = match.round;
 
   match.winner = winnerIndex;
   match.isPlayed = true;
+  if (scores) {
+    match.scoreP1 = scores.p1Score;
+    match.scoreP2 = scores.p2Score;
+  }
   const winner = winnerIndex === 0 ? match.player1 : match.player2;
 
   updatedMatches.forEach(m => {

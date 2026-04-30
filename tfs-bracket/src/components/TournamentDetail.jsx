@@ -1,7 +1,10 @@
+import { useState, useEffect } from "react";
 import { db, doc, updateDoc } from "../firebase";
-import { generateBracket, advanceBracket, parseFirestoreDate, resetBracket } from "../utils/bracket";
+import { generateBracket, advanceBracket, parseFirestoreDate } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import BracketView from "./BracketView";
+import TournamentSidebar from "./TournamentSidebar";
+import MatchScoreModal from "./MatchScoreModal";
 
 export default function TournamentDetail({ tournament, tournaments, user, onBack, onUpdate }) {
   const liveTournament = tournaments?.find((t) => t.id === tournament.id) || tournament;
@@ -22,6 +25,16 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
     regOpen &&
     !t.participants.some((p) => p.id === user.uid) &&
     t.participants.length < t.maxParticipants;
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+
+  useEffect(() => {
+    const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const handleJoin = async () => {
     const ref = doc(db, "tournaments", t.id);
@@ -48,14 +61,29 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
     logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length } });
   };
 
-  const handleUpdateMatch = async (matchIndex, winnerIndex) => {
-    const match = t.matches[matchIndex];
+  const handleMatchClick = (match) => {
+    setSelectedMatch(match);
+  };
+
+  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex }) => {
+    const matchIndex = t.matches.findIndex((m) => m.id === match.id);
     const winner = winnerIndex === 0 ? match.player1 : match.player2;
-    const matches = advanceBracket(t.matches, matchIndex, winnerIndex);
+    const matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches });
     onUpdate({ ...t, matches });
-    logEvent({ action: "record_match_winner", details: { tournamentId: t.id, matchIndex, winner, round: match.round } });
+    logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner, round: match.round, score: `${p1Score}-${p2Score}` } });
+  };
+
+  const handleUpdateAllWinConditions = async (condition) => {
+    const updatedMatches = t.matches.map((match) => ({
+      ...match,
+      winCondition: condition,
+    }));
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches: updatedMatches });
+    onUpdate({ ...t, matches: updatedMatches });
+    logEvent({ action: "update_all_win_conditions", details: { tournamentId: t.id, condition } });
   };
 
   const handleAddFakeUsers = async () => {
@@ -87,92 +115,115 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
     logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
   };
 
+  const getDefaultWinCondition = () => {
+    if (!t.matches || t.matches.length === 0) return "ft3";
+    return t.matches[0].winCondition || "ft3";
+  };
+
   return (
-    <div className="tournament-detail">
-      <button className="btn-back" onClick={onBack}>
-        ← Back
-      </button>
-      <div className="detail-header">
-        <h2>{t.name}</h2>
-        {isAdmin && !t.published && (
-          <button className="btn-primary" onClick={handlePublish}>
-            Publish
-          </button>
+    <div className={`tournament-detail ${sidebarOpen ? "with-sidebar" : ""}`}>
+      <div className="detail-content">
+        <button className="btn-back" onClick={onBack}>
+          ← Back
+        </button>
+        <div className="detail-header">
+          <h2>{t.name}</h2>
+          {isAdmin && !t.published && (
+            <button className="btn-primary" onClick={handlePublish}>
+              Publish
+            </button>
+          )}
+        </div>
+
+        <div className="detail-info">
+          <p>
+            <strong>Admin:</strong> {t.adminName}
+          </p>
+          <p>
+            <strong>Registration:</strong>{" "}
+            {regStartDate ? regStartDate.toLocaleString() : "TBD"} -{" "}
+            {regEndDate ? regEndDate.toLocaleString() : "TBD"}
+          </p>
+          <p>
+            <strong>Status:</strong>{" "}
+            {t.started
+              ? "In Progress"
+              : t.published
+              ? "Open"
+              : "Draft"}
+          </p>
+        </div>
+
+        {!t.started && (
+          <div className="participants-section">
+            <h3>
+              Participants ({t.participants.length}/{t.maxParticipants})
+            </h3>
+            {t.participants.length === 0 ? (
+              <p className="empty">No participants yet</p>
+            ) : (
+              <ul className="participants-list">
+                {t.participants.map((p, i) => (
+                  <li key={i}>
+                    {i + 1}. {p.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canJoin && (
+              <button className="btn-primary" onClick={handleJoin}>
+                Join Tournament
+              </button>
+            )}
+            {isDev && isAdmin && (
+                <button className="btn-secondary" onClick={handleAddFakeUsers}>
+                  + Add Fake Users
+                </button>
+              )}
+              {isAdmin &&
+                t.published &&
+                t.participants.length >= 2 &&
+                !t.started && (
+                  <button className="btn-primary" onClick={handleStartTournament}>
+                    Start Tournament
+                  </button>
+                )}
+          </div>
+        )}
+
+        {t.started && t.matches && (
+          <>
+            <div className="bracket-actions">
+              {isAdmin && (
+                <button className="btn-secondary" onClick={handleResetBracket}>
+                  Reset Bracket
+                </button>
+              )}
+            </div>
+            <BracketView
+              matches={t.matches}
+              onMatchClick={handleMatchClick}
+              isAdmin={isAdmin}
+            />
+          </>
         )}
       </div>
 
-      <div className="detail-info">
-        <p>
-          <strong>Admin:</strong> {t.adminName}
-        </p>
-        <p>
-          <strong>Registration:</strong>{" "}
-          {regStartDate ? regStartDate.toLocaleString() : "TBD"} -{" "}
-          {regEndDate ? regEndDate.toLocaleString() : "TBD"}
-        </p>
-        <p>
-          <strong>Status:</strong>{" "}
-          {t.started
-            ? "In Progress"
-            : t.published
-            ? "Open"
-            : "Draft"}
-        </p>
-      </div>
-
-      {!t.started && (
-        <div className="participants-section">
-          <h3>
-            Participants ({t.participants.length}/{t.maxParticipants})
-          </h3>
-          {t.participants.length === 0 ? (
-            <p className="empty">No participants yet</p>
-          ) : (
-            <ul className="participants-list">
-              {t.participants.map((p, i) => (
-                <li key={i}>
-                  {i + 1}. {p.name}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canJoin && (
-            <button className="btn-primary" onClick={handleJoin}>
-              Join Tournament
-            </button>
-          )}
-          {isDev && isAdmin && (
-              <button className="btn-secondary" onClick={handleAddFakeUsers}>
-                + Add Fake Users
-              </button>
-            )}
-            {isAdmin &&
-              t.published &&
-              t.participants.length >= 2 &&
-              !t.started && (
-                <button className="btn-primary" onClick={handleStartTournament}>
-                  Start Tournament
-                </button>
-              )}
-        </div>
+      {isAdmin && (
+        <TournamentSidebar
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          currentCondition={getDefaultWinCondition()}
+          onUpdateCondition={handleUpdateAllWinConditions}
+        />
       )}
 
-      {t.started && t.matches && (
-        <>
-          <div className="bracket-actions">
-            {isAdmin && (
-              <button className="btn-secondary" onClick={handleResetBracket}>
-                Reset Bracket
-              </button>
-            )}
-          </div>
-          <BracketView
-            matches={t.matches}
-            onUpdateMatch={handleUpdateMatch}
-            isAdmin={isAdmin}
-          />
-        </>
-      )}
+      <MatchScoreModal
+        isOpen={!!selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+        match={selectedMatch}
+        onSave={handleSaveScore}
+      />
     </div>
   );
 }
