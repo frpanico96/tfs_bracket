@@ -4,10 +4,13 @@ import {
   signInWithGoogle,
   logOut,
   auth,
+  db,
   tournamentsRef,
   query,
   orderBy,
   onSnapshot,
+  doc,
+  deleteDoc,
 } from "./firebase";
 import "./App.css";
 import Header from "./components/Header";
@@ -52,6 +55,13 @@ function App() {
     setSelectedTournament(null);
   };
 
+  const handleDeleteTournament = async (tournamentId) => {
+    const ref = doc(db, "tournaments", tournamentId);
+    await deleteDoc(ref);
+    setView("list");
+    setSelectedTournament(null);
+  };
+
   if (!user) {
     return (
       <div className="login-container">
@@ -74,11 +84,13 @@ function App() {
         {view === "list" && (
           <TournamentList
             tournaments={tournaments}
+            user={user}
             onSelect={(t) => {
               setSelectedTournament(t);
               setView("detail");
             }}
             onCreate={() => setView("create")}
+            onDelete={handleDeleteTournament}
           />
         )}
         {view === "create" && (
@@ -98,6 +110,7 @@ function App() {
             user={user}
             onBack={() => setView("list")}
             onUpdate={(t) => setSelectedTournament(t)}
+            onDelete={handleDeleteTournament}
           />
         )}
       </main>

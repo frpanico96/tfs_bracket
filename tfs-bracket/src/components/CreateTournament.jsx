@@ -56,15 +56,13 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         </label>
         <label>
           Max Participants
-          <select
+          <input
+            type="number"
+            min="2"
+            max="64"
             value={maxParticipants}
-            onChange={(e) => setMaxParticipants(e.target.value)}
-          >
-            <option value={4}>4</option>
-            <option value={8}>8</option>
-            <option value={16}>16</option>
-            <option value={32}>32</option>
-          </select>
+            onChange={(e) => setMaxParticipants(parseInt(e.target.value))}
+          />
         </label>
         <label>
           Registration Start

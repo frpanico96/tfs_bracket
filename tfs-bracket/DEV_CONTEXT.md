@@ -1,5 +1,10 @@
 # TFS Bracket - Project Context
 
+## Workflow Rules
+- **Always pull from `main`** at the start of each work session (only the first time)
+- **Commit on every change** - small, incremental commits after each feature/fix
+- **Update this file** with changes made in each iteration
+
 ## Overview
 A tournament bracket management app for creating and managing competitive tournaments.
 
@@ -24,7 +29,7 @@ VITE_MEASUREMENT_ID
 ```
 id: string
 name: string
-maxParticipants: number (4, 8, 16, 32)
+maxParticipants: number (2-64, any number including odd)
 regStart: timestamp
 regEnd: timestamp
 createdAt: timestamp
@@ -68,6 +73,19 @@ timestamp: timestamp
 
 ## Dev Features
 - `+ Add Fake Users` button (only in dev mode, admin only) - fills empty slots with fake participants
+- `Change Max Players` button (only in dev mode, admin only) - updates maxParticipants for testing
+
+## Iteration Log
+
+### Iteration 1: Preliminary Rounds for Odd Player Counts
+- **Feature**: Added support for odd number of players via preliminary rounds
+- **Algorithm**: For N players, calculate `base = 2^floor(log2(N))`, create `N - base` preliminary matches, remaining players get byes into round 2
+- **Changes**:
+  - `src/utils/bracket.js`: Rewrote `generateBracket` to create preliminary round (round 1) when player count isn't a power of 2
+  - `src/components/BracketView.jsx`: Added round naming (Preliminary, Quarterfinals, Semifinals, Finals)
+  - `src/components/CreateTournament.jsx`: Changed maxParticipants from select dropdown to number input (2-64)
+  - `src/components/TournamentDetail.jsx`: Added "Change Max Players" dev button for testing
+- **Testing**: Update mock tournament maxParticipants from 8 to 11 via dev button, add 3 more fake users
 
 ## Available Scripts
 ```bash

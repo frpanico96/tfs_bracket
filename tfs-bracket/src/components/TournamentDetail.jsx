@@ -6,7 +6,7 @@ import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
 
-export default function TournamentDetail({ tournament, tournaments, user, onBack, onUpdate }) {
+export default function TournamentDetail({ tournament, tournaments, user, onBack, onUpdate, onDelete }) {
   const liveTournament = tournaments?.find((t) => t.id === tournament.id) || tournament;
   const t = liveTournament;
   
@@ -28,6 +28,7 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -115,6 +116,11 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
     logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
   };
 
+  const handleDelete = async () => {
+    logEvent({ action: "delete_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+    onDelete(t.id);
+  };
+
   const getDefaultWinCondition = () => {
     if (!t.matches || t.matches.length === 0) return "ft3";
     return t.matches[0].winCondition || "ft3";
@@ -123,9 +129,6 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
   return (
     <div className={`tournament-detail ${sidebarOpen ? "with-sidebar" : ""}`}>
       <div className="detail-content">
-        <button className="btn-back" onClick={onBack}>
-          ← Back
-        </button>
         <div className="detail-header">
           <h2>{t.name}</h2>
           {isAdmin && !t.published && (
@@ -155,10 +158,17 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
         </div>
 
         {!t.started && (
-          <div className="participants-section">
+          <>
+            <div className="bracket-actions">
+              <button className="btn-secondary" onClick={onBack}>
+                ← Back
+              </button>
+            </div>
+            <div className="participants-section">
             <h3>
               Participants ({t.participants.length}/{t.maxParticipants})
             </h3>
+            <div className="participants-list-scroll">
             {t.participants.length === 0 ? (
               <p className="empty">No participants yet</p>
             ) : (
@@ -170,6 +180,8 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
                 ))}
               </ul>
             )}
+            </div>
+            <div className="participants-actions">
             {canJoin && (
               <button className="btn-primary" onClick={handleJoin}>
                 Join Tournament
@@ -180,23 +192,42 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
                   + Add Fake Users
                 </button>
               )}
-              {isAdmin &&
-                t.published &&
-                t.participants.length >= 2 &&
-                !t.started && (
-                  <button className="btn-primary" onClick={handleStartTournament}>
-                    Start Tournament
-                  </button>
-                )}
+              {isDev && isAdmin && (
+                <button className="btn-secondary" onClick={() => {
+                  const newMax = prompt("Set max participants:", t.maxParticipants);
+                  if (newMax && !isNaN(newMax) && parseInt(newMax) >= 2) {
+                    const ref = doc(db, "tournaments", t.id);
+                    updateDoc(ref, { maxParticipants: parseInt(newMax) });
+                    onUpdate({ ...t, maxParticipants: parseInt(newMax) });
+                  }
+                }}>
+                  Change Max Players
+                </button>
+              )}
+              {isAdmin && t.published && (
+                <button className="btn-primary" onClick={handleStartTournament} disabled={t.participants.length < 2}>
+                  Start Tournament ({t.participants.length}/{t.maxParticipants})
+                </button>
+              )}
+              </div>
           </div>
+          </>
         )}
 
         {t.started && t.matches && (
           <>
             <div className="bracket-actions">
+              <button className="btn-secondary" onClick={onBack}>
+                ← Back
+              </button>
               {isAdmin && (
                 <button className="btn-secondary" onClick={handleResetBracket}>
                   Reset Bracket
+                </button>
+              )}
+              {isAdmin && (
+                <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
+                  Delete Tournament
                 </button>
               )}
             </div>
@@ -208,6 +239,28 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
           </>
         )}
       </div>
+
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Tournament</h3>
+              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete "{t.name}"? This action cannot be undone.</p>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </button>
+                <button className="btn-danger" onClick={handleDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isAdmin && (
         <TournamentSidebar
