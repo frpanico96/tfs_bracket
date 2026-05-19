@@ -963,3 +963,118 @@ body {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+.bracket-type-toggle {
+  display: flex;
+  gap: 0;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bracket-type-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bracket-type-btn:first-child {
+  border-right: 1px solid #e0e0e0;
+}
+
+.bracket-type-btn.selected {
+  background: #667eea;
+  color: white;
+}
+
+.bracket.double-elimination {
+  height: auto;
+  min-height: 400px;
+}
+
+.de-bracket-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.de-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.de-section-title {
+  font-size: 13px;
+  color: #667eea;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #667eea;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.de-section .bracket-rounds {
+  overflow-x: auto;
+}
+
+.gf-rounds {
+  display: flex;
+  gap: 8px;
+}
+
+.match.grand-final {
+  background: linear-gradient(135deg, #fff8e1, #fff3cd);
+  border: 2px solid #f59e0b;
+}
+
+.match.grand-final.completed {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-color: #4caf50;
+}
+
+.match.grand-final.clickable:hover {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #eef0ff, #fff8e1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.match.grand-final.clickable::after {
+  content: "Record Grand Final Score";
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  color: #f59e0b;
+  margin-top: 6px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.match.grand-final.clickable:hover::after {
+  opacity: 1;
+}
+
+.gf-winner-label::before {
+  content: "WB • ";
+  font-size: 9px;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.gf-loser-label::before {
+  content: "LB • ";
+  font-size: 9px;
+  color: #f59e0b;
+  font-weight: 600;
+}

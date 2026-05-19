@@ -11,6 +11,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
   const [maxParticipants, setMaxParticipants] = useState(8);
   const [regStart, setRegStart] = useState("");
   const [regEnd, setRegEnd] = useState("");
+  const [bracketType, setBracketType] = useState("single");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,10 +29,25 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         adminId: user.uid,
         adminName: user.displayName,
         published: false,
+        started: false,
+        bracketType,
         participants: [],
         matches: [],
       });
-      onCreated({ id: docRef.id, name, maxParticipants, regStart, regEnd });
+      onCreated({
+        id: docRef.id,
+        name,
+        maxParticipants: parseInt(maxParticipants),
+        regStart: new Date(regStart),
+        regEnd: new Date(regEnd),
+        adminId: user.uid,
+        adminName: user.displayName,
+        published: false,
+        started: false,
+        bracketType,
+        participants: [],
+        matches: [],
+      });
       logEvent({ action: "create_tournament", details: { tournamentId: docRef.id, name, adminId: user.uid } });
     } catch (error) {
       console.error("Create failed:", error);
@@ -63,6 +79,25 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
             value={maxParticipants}
             onChange={(e) => setMaxParticipants(parseInt(e.target.value))}
           />
+        </label>
+        <label>
+          Bracket Type
+          <div className="bracket-type-toggle">
+            <button
+              type="button"
+              className={`bracket-type-btn ${bracketType === "single" ? "selected" : ""}`}
+              onClick={() => setBracketType("single")}
+            >
+              Single Elimination
+            </button>
+            <button
+              type="button"
+              className={`bracket-type-btn ${bracketType === "double" ? "selected" : ""}`}
+              onClick={() => setBracketType("double")}
+            >
+              Double Elimination
+            </button>
+          </div>
         </label>
         <label>
           Registration Start

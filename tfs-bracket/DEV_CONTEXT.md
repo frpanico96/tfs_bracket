@@ -37,9 +37,11 @@ adminId: string
 adminName: string
 published: boolean
 started: boolean
+bracketType: string ("single" | "double")
 participants: array<{ id, name, email }>
 matches: array<{
   id: string,
+  bracket: string ("winners" | "losers" | "grandFinal"),
   round: number,
   matchIndex: number,
   player1: string,
@@ -48,6 +50,10 @@ matches: array<{
   isPlayed: boolean,
   prevMatch1: string | null,
   prevMatch2: string | null,
+  prevMatchLoser1: string | null,
+  prevMatchLoser2: string | null,
+  loserGoesTo: string | null,
+  isGrandFinalReset: boolean,
   winCondition: string ("ft2" | "ft3" | "ft5" | "ft7" | "ft9"),
   scoreP1: number,
   scoreP2: number
@@ -95,8 +101,41 @@ npm run lint     # ESLint check
 npm run preview # Preview production build
 ```
 
-## Current Issues/TODO
-- None identified
+## Iteration 2: Double Elimination (Winner/Loser Bracket)
+
+### Feature: Double Elimination Support
+- **Toggle**: New "Single Elimination" / "Double Elimination" toggle in CreateTournament form (stores `bracketType` field on Firestore)
+- **Bracket Generation**: `generateDoubleEliminationBracket` in `src/utils/bracket.js` creates winners + losers brackets + grand final with bracket reset support
+- **Data Model**: Matches have `bracket` field (`"winners"`, `"losers"`, `"grandFinal"`), `loserGoesTo` on WB matches, `prevMatchLoser1/2` on LB matches, `isGrandFinalReset` on GF reset match
+- **Grand Final Reset**: When the Losers Bracket champion wins GF match 1, `gf-m1` activates automatically — the LB champion must win a second match to claim the title
+- **Bracket View**: `BracketView.jsx` renders three sections: Winners Bracket, Losers Bracket, Grand Final with labels (WB • / LB • prefixes)
+
+### Changes:
+- `src/utils/bracket.js`: Added `generateDoubleEliminationBracket`, `propagateDoubleByeWinners`, `isDoubleBracket`; updated `advanceBracket` and `resetBracket` to handle double elim
+- `src/components/CreateTournament.jsx`: Added bracket type toggle (single/double)
+- `src/components/TournamentDetail.jsx`: Updated start/reset to use double elim generator when `bracketType === "double"`
+- `src/components/BracketView.jsx`: Rewritten with `SingleBracketView` / `DoubleBracketView` / `GrandFinalMatch` / `MatchCard` sub-components
+- `src/App.css`: Added styles for bracket type toggle, double elimination layout, grand final match card, WB/LB labels
+
+### Firestore Schema Update
+```
+bracketType: string ("single" | "double")  # Added to tournaments collection
+```
+
+### Bug Fixes (Iteration 2.1)
+- **Data staleness**: `TournamentDetail.jsx` was using `tournaments.find()` (stale Firestore snapshot) instead of the `tournament` prop (which is updated locally via `onUpdate`). Changed to use `tournament` directly, ensuring loser/winner propagations are immediately visible without waiting for Firestore sync.
+- **Round naming**: `getLbRoundName` in `BracketView.jsx` marked ALL single-match LB rounds as "Losers Final". Fixed to only label the last LB round as "Losers Final"; intermediate consolidation rounds are correctly named "Losers Round N".
+- **LB winner propagation**: `advanceBracket` in `bracket.js` had a bug where `match.bracket` was always referencing the original match (not the auto-advanced match), causing premature breaks in the propagation loop. Fixed by tracking `currentBracket` as the loop progresses.
+- **BYE auto-advance in LB**: `propagateByeWinnersLosers` only did single-level propagation for LB matches. Rewritten with a while loop that chains through BYEs in both WB and LB brackets.
+- **MatchCard clickability**: Was only checking `player2 === "BYE"` (single elim convention). Fixed to check both player slots for BYE, and to handle null players.
+
+### Testing
+1. Create a tournament with "Double Elimination" type
+2. Add participants (need power of 2 for clean bracket, e.g., 4 or 8)
+3. Start tournament → verify winners + losers brackets render
+4. Record scores in WB → verify losers drop to LB
+5. Complete LB → verify LB champion reaches GF
+6. Test GF reset: if LB champion wins GF match 1, verify reset match activates
 
 ## Refactoring (Completed)
 All code has been split into reusable components following best practices:

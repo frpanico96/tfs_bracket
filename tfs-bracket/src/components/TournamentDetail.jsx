@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { db, doc, updateDoc } from "../firebase";
-import { generateBracket, advanceBracket, parseFirestoreDate } from "../utils/bracket";
+import { generateBracket, generateDoubleEliminationBracket, advanceBracket, parseFirestoreDate } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
 
-export default function TournamentDetail({ tournament, tournaments, user, onBack, onUpdate, onDelete }) {
-  const liveTournament = tournaments?.find((t) => t.id === tournament.id) || tournament;
-  const t = liveTournament;
+export default function TournamentDetail({ tournament, user, onBack, onUpdate, onDelete }) {
+  const t = tournament;
   
   const isDev = import.meta.env.DEV;
   const isAdmin = user.uid === t.adminId;
@@ -55,11 +54,13 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
   };
 
   const handleStartTournament = async () => {
-    const matches = generateBracket(t.participants, t.maxParticipants);
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    const wc = t.defaultWinCondition || "ft3";
+    const matches = bracketGen(t.participants, t.maxParticipants, wc);
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches, started: true });
     onUpdate({ ...t, matches, started: true });
-    logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length } });
+    logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
   };
 
   const handleMatchClick = (match) => {
@@ -77,28 +78,38 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
   };
 
   const handleUpdateAllWinConditions = async (condition) => {
-    const updatedMatches = t.matches.map((match) => ({
-      ...match,
-      winCondition: condition,
-    }));
     const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { matches: updatedMatches });
-    onUpdate({ ...t, matches: updatedMatches });
+    if (t.matches && t.matches.length > 0) {
+      const updatedMatches = t.matches.map((match) => ({
+        ...match,
+        winCondition: condition,
+      }));
+      await updateDoc(ref, { matches: updatedMatches, defaultWinCondition: condition });
+      onUpdate({ ...t, matches: updatedMatches, defaultWinCondition: condition });
+    } else {
+      await updateDoc(ref, { defaultWinCondition: condition });
+      onUpdate({ ...t, defaultWinCondition: condition });
+    }
     logEvent({ action: "update_all_win_conditions", details: { tournamentId: t.id, condition } });
   };
 
   const handleAddFakeUsers = async () => {
-    const fakeNames = [
-      "Player One", "Player Two", "Player Three", "Player Four",
-      "Player Five", "Player Six", "Player Seven", "Player Eight",
+    const numWords = [
+      "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+      "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
+      "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty",
     ];
     const currentCount = t.participants.length;
     const slotsAvailable = t.maxParticipants - currentCount;
-    const toAdd = fakeNames.slice(0, slotsAvailable).map((name, i) => ({
-      id: `fake-${currentCount + i}`,
-      name,
-      email: `${name.toLowerCase().replace(" ", "-")}@example.com`,
-    }));
+    const toAdd = Array.from({ length: slotsAvailable }, (_, i) => {
+      const num = currentCount + i + 1;
+      const word = numWords[num - 1] || String(num);
+      return {
+        id: `fake-${currentCount + i}`,
+        name: `Player ${word}`,
+        email: `player${num}@example.com`,
+      };
+    });
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, ...toAdd],
@@ -109,7 +120,9 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
 
   const handleResetBracket = async () => {
     if (!confirm("Are you sure you want to reset the bracket? All matches will be cleared.")) return;
-    const freshMatches = generateBracket(t.participants, t.maxParticipants);
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    const wc = t.defaultWinCondition || "ft3";
+    const freshMatches = bracketGen(t.participants, t.maxParticipants, wc);
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches: freshMatches });
     onUpdate({ ...t, matches: freshMatches });
@@ -122,8 +135,9 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
   };
 
   const getDefaultWinCondition = () => {
-    if (!t.matches || t.matches.length === 0) return "ft3";
-    return t.matches[0].winCondition || "ft3";
+    if (t.defaultWinCondition) return t.defaultWinCondition;
+    if (t.matches && t.matches.length > 0) return t.matches[0].winCondition || "ft3";
+    return "ft3";
   };
 
   return (
@@ -235,6 +249,7 @@ export default function TournamentDetail({ tournament, tournaments, user, onBack
               matches={t.matches}
               onMatchClick={handleMatchClick}
               isAdmin={isAdmin}
+              bracketType={t.bracketType}
             />
           </>
         )}

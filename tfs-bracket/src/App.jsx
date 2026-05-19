@@ -106,7 +106,6 @@ function App() {
         {view === "detail" && selectedTournament && (
           <TournamentDetail
             tournament={selectedTournament}
-            tournaments={tournaments}
             user={user}
             onBack={() => setView("list")}
             onUpdate={(t) => setSelectedTournament(t)}
