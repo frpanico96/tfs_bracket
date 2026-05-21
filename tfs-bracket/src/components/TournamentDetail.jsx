@@ -5,6 +5,9 @@ import { logEvent } from "../utils/logger";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
+import BaseModal from "./BaseModal";
+
+const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
 
 export default function TournamentDetail({ tournament, user, onBack, onUpdate, onDelete }) {
   const t = tournament;
@@ -28,6 +31,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [matchWinConditionEdit, setMatchWinConditionEdit] = useState(null);
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -91,6 +95,17 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       onUpdate({ ...t, defaultWinCondition: condition });
     }
     logEvent({ action: "update_all_win_conditions", details: { tournamentId: t.id, condition } });
+  };
+
+  const handleUpdateMatchWinCondition = async (match, condition) => {
+    const matchIndex = t.matches.findIndex((m) => m.id === match.id);
+    const updatedMatches = t.matches.map((m, i) =>
+      i === matchIndex ? { ...m, winCondition: condition } : m
+    );
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches: updatedMatches });
+    onUpdate({ ...t, matches: updatedMatches });
+    logEvent({ action: "update_match_win_condition", details: { tournamentId: t.id, matchId: match.id, newCondition: condition, previousCondition: match.winCondition } });
   };
 
   const handleAddFakeUsers = async () => {
@@ -250,6 +265,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               onMatchClick={handleMatchClick}
               isAdmin={isAdmin}
               bracketType={t.bracketType}
+              onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
             />
           </>
         )}
@@ -292,6 +308,32 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         match={selectedMatch}
         onSave={handleSaveScore}
       />
+
+      <BaseModal
+        isOpen={!!matchWinConditionEdit}
+        onClose={() => setMatchWinConditionEdit(null)}
+        title="Match Win Condition"
+      >
+        <div className="modal-options">
+          {WIN_CONDITIONS.map((condition) => (
+            <button
+              key={condition}
+              className={`modal-option ${matchWinConditionEdit?.winCondition === condition ? "selected" : ""}`}
+              onClick={() => {
+                if (matchWinConditionEdit) {
+                  handleUpdateMatchWinCondition(matchWinConditionEdit, condition);
+                  setMatchWinConditionEdit(null);
+                }
+              }}
+            >
+              {condition.toUpperCase()}
+              <span className="modal-option-desc">
+                First to {condition.replace("ft", "")} wins
+              </span>
+            </button>
+          ))}
+        </div>
+      </BaseModal>
     </div>
   );
 }

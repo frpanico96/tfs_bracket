@@ -80,7 +80,7 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
           <div className="match-score-sidebar-section">
             <h4>Match Info</h4>
             <p className="match-info-label">Round</p>
-            <p className="match-info-value">Round {match.round + 1}</p>
+            <p className="match-info-value">Round {match.round}</p>
             <p className="match-info-label">Match</p>
             <p className="match-info-value">#{match.matchIndex + 1}</p>
           </div>

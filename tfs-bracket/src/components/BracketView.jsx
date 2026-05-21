@@ -25,7 +25,7 @@ function getLbRoundName(roundMatches, roundIndex, totalRounds) {
   return `Losers Round ${roundMatches[0]?.round ?? 0}`;
 }
 
-function MatchCard({ match, onMatchClick, isAdmin }) {
+function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick }) {
   if (match.player1 === "BYE" && match.player2 === "BYE") return null;
   const isPlayed = match.isPlayed === true || match.winner != null;
   const p1Filled = match.player1 && match.player1 !== "TBD";
@@ -43,7 +43,12 @@ function MatchCard({ match, onMatchClick, isAdmin }) {
     >
       {showWinCond && (
         <div className="match-header">
-          <span className="match-win-condition">{match.winCondition?.toUpperCase() || "FT3"}</span>
+          <span
+            className={`match-win-condition${isAdmin ? " clickable-cond" : ""}`}
+            onClick={(e) => { e.stopPropagation(); if (isAdmin) onMatchWinConditionClick?.(match); }}
+          >
+            {match.winCondition?.toUpperCase() || "FT3"}
+          </span>
         </div>
       )}
       <div className="match-row">
@@ -70,7 +75,7 @@ function MatchCard({ match, onMatchClick, isAdmin }) {
   );
 }
 
-function GrandFinalMatch({ match, onMatchClick, isAdmin, label }) {
+function GrandFinalMatch({ match, onMatchClick, isAdmin, label, onMatchWinConditionClick }) {
   const isPlayed = match.isPlayed === true || match.winner != null;
   const p1Filled = match.player1 && match.player1 !== "TBD";
   const p2Filled = match.player2 && match.player2 !== "TBD";
@@ -98,7 +103,12 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, label }) {
           onClick={() => isClickable && onMatchClick(match)}
         >
           <div className="match-header">
-            <span className="match-win-condition">{match.winCondition?.toUpperCase() || "FT3"}</span>
+            <span
+              className={`match-win-condition${isAdmin ? " clickable-cond" : ""}`}
+              onClick={(e) => { e.stopPropagation(); if (isAdmin) onMatchWinConditionClick?.(match); }}
+            >
+              {match.winCondition?.toUpperCase() || "FT3"}
+            </span>
           </div>
           <div className="match-row">
             <span className={`${match.winner === 0 ? "winner" : ""} gf-winner-label`}>
@@ -126,7 +136,7 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, label }) {
   );
 }
 
-export default function BracketView({ matches, onMatchClick, isAdmin, bracketType }) {
+export default function BracketView({ matches, onMatchClick, isAdmin, bracketType, onMatchWinConditionClick }) {
   const isDouble = bracketType === "double";
 
   if (!matches || matches.length === 0) {
@@ -134,13 +144,13 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
   }
 
   if (!isDouble) {
-    return <SingleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} />;
+    return <SingleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />;
   }
 
-  return <DoubleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} />;
+  return <DoubleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />;
 }
 
-function SingleBracketView({ matches, onMatchClick, isAdmin }) {
+function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick }) {
   const rounds = groupByRound(matches);
   const hasPrelims = rounds.length > 0 && rounds[0].length < rounds[1]?.length;
   const lastRound = rounds[rounds.length - 1];
@@ -158,7 +168,7 @@ function SingleBracketView({ matches, onMatchClick, isAdmin }) {
             <h4>{getRoundName(roundMatches, roundIndex === rounds.length - 1, roundIndex === 0, hasPrelims)}</h4>
             <div className="round-matches">
               {roundMatches.map((match) => (
-                <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} />
+                <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
               ))}
             </div>
           </div>
@@ -174,7 +184,7 @@ function SingleBracketView({ matches, onMatchClick, isAdmin }) {
   );
 }
 
-function DoubleBracketView({ matches, onMatchClick, isAdmin }) {
+function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick }) {
   const wbMatches = matches.filter(m => m.bracket === 'winners');
   const lbMatches = matches.filter(m => m.bracket === 'losers');
   const gfMatches = matches.filter(m => m.bracket === 'grandFinal');
@@ -213,7 +223,7 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin }) {
                 <h4>{getWbRoundName(roundMatches, roundIndex, wbRounds.length)}</h4>
                 <div className="round-matches">
                   {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} />
+                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
                   ))}
                 </div>
               </div>
@@ -229,7 +239,7 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin }) {
                 <h4>{getLbRoundName(roundMatches, roundIndex, lbRounds.length)}</h4>
                 <div className="round-matches">
                   {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} />
+                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
                   ))}
                 </div>
               </div>
@@ -240,9 +250,9 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin }) {
         <div className="de-section">
           <h4 className="de-section-title">Grand Final</h4>
           <div className="bracket-rounds gf-rounds">
-            <GrandFinalMatch match={gfM0} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final" />
+            <GrandFinalMatch match={gfM0} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final" onMatchWinConditionClick={onMatchWinConditionClick} />
             {(gfM1Active || gfM1?.winner != null) && (
-              <GrandFinalMatch match={gfM1} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final Reset" />
+              <GrandFinalMatch match={gfM1} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final Reset" onMatchWinConditionClick={onMatchWinConditionClick} />
             )}
           </div>
         </div>

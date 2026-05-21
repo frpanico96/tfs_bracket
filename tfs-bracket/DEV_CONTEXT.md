@@ -166,3 +166,34 @@ src/
 - Always create new components in `src/components/`
 - Keep utility functions in `src/utils/`
 - Import firebase from `../firebase` relative path
+- Write tests alongside source files as `*.test.js` or `*.test.jsx`
+- Mock Firebase modules in component tests using `vi.mock("../firebase")`
+
+## Testing
+- **Framework**: Vitest (v4) with jsdom environment
+- **Libraries**: @testing-library/react, @testing-library/jest-dom, @testing-library/user-event
+- **Setup**: `src/test/setup.js` (imports jest-dom matchers)
+- **Scripts**: `npm test` (run once), `npm run test:watch` (watch mode)
+
+### Test Files
+```
+src/
+├── utils/
+│   ├── bracket.js
+│   ├── bracket.test.js          # 33 tests (generation, advance, reset, utils)
+│   ├── logger.js
+│   └── logger.test.js           # 5 tests (Firebase addDoc mocking)
+└── components/
+    ├── Header.test.jsx          # 5 tests
+    ├── BaseModal.test.jsx       # 5 tests
+    ├── PlayerColumn.test.jsx    # 8 tests
+    ├── TournamentList.test.jsx  # 9 tests
+    ├── BracketView.test.jsx     # 11 tests (single/double elim rendering)
+    ├── MatchScoreModal.test.jsx # 9 tests (score entry, validation)
+    ├── TournamentSidebar.test.jsx # 4 tests
+    └── CreateTournament.test.jsx  # 5 tests
+Total: 97 tests across 10 files
+```
+
+### Bug Fix: advanceBracket single elim propagation
+`advanceBracket` in `bracket.js` was checking `m.bracket === 'winners'` in the propagation loop, but single elimination matches don't have a `bracket` property. Fixed by adding `!m.bracket ||` to the condition so single elim winners propagate correctly. Discovered via unit tests.

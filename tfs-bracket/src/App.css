@@ -441,6 +441,14 @@ body {
   border-radius: 3px;
 }
 
+.match-win-condition.clickable-cond {
+  cursor: pointer;
+}
+
+.match-win-condition.clickable-cond:hover {
+  background: #5a6fd6;
+}
+
 .bye-match {
   opacity: 0.5;
   background: #e8e8e8;

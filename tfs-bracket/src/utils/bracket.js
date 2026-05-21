@@ -585,7 +585,7 @@ export function advanceBracket(matches, matchIndex, winnerIndex, scores) {
     match.scoreP2 = scores.p2Score;
   }
 
-  const winner = winnerIndex === 0 ? match.player1 : match.player2;
+  let winner = winnerIndex === 0 ? match.player1 : match.player2;
   const loser = winnerIndex === 0 ? match.player2 : match.player1;
 
   if (match.bracket === 'winners' && match.loserGoesTo && loser !== "BYE") {
@@ -637,7 +637,7 @@ export function advanceBracket(matches, matchIndex, winnerIndex, scores) {
       );
     } else {
       nextMatch = updatedMatches.find(m =>
-        (m.bracket === 'winners' || (m.bracket === 'grandFinal' && !m.isGrandFinalReset)) &&
+        (!m.bracket || m.bracket === 'winners' || (m.bracket === 'grandFinal' && !m.isGrandFinalReset)) &&
         (m.prevMatch1 === currentMatchId || m.prevMatch2 === currentMatchId)
       );
     }
