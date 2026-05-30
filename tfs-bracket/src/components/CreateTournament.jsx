@@ -19,10 +19,23 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
       alert("Please fill all fields");
       return;
     }
+    if (name.length > 100) {
+      alert("Tournament name must be 100 characters or less");
+      return;
+    }
+    const maxP = parseInt(maxParticipants);
+    if (isNaN(maxP) || maxP < 2 || maxP > 64) {
+      alert("Max participants must be between 2 and 64");
+      return;
+    }
+    if (new Date(regEnd) <= new Date(regStart)) {
+      alert("Registration end must be after registration start");
+      return;
+    }
     try {
       const docRef = await addDoc(tournamentsRef, {
         name,
-        maxParticipants: parseInt(maxParticipants),
+        maxParticipants: maxP,
         regStart: new Date(regStart),
         regEnd: new Date(regEnd),
         createdAt: serverTimestamp(),
@@ -37,7 +50,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
       onCreated({
         id: docRef.id,
         name,
-        maxParticipants: parseInt(maxParticipants),
+        maxParticipants: maxP,
         regStart: new Date(regStart),
         regEnd: new Date(regEnd),
         adminId: user.uid,

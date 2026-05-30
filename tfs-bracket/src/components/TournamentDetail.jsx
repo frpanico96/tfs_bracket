@@ -13,7 +13,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const t = tournament;
   
   const isDev = import.meta.env.DEV;
-  const isAdmin = user.uid === t.adminId;
+  const isAdmin = user?.uid && t?.adminId && user.uid === t.adminId;
   const now = new Date();
   const regStartDate = parseFirestoreDate(t.regStart);
   const regEndDate = parseFirestoreDate(t.regEnd);
@@ -44,6 +44,9 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   }, []);
 
   const handleJoin = async () => {
+    if (!t.published) return;
+    if (t.participants.some((p) => p.id === user.uid)) return;
+    if (t.participants.length >= t.maxParticipants) return;
     const ref = doc(db, "tournaments", t.id);
     const newParticipant = { id: user.uid, name: user.displayName, email: user.email };
     await updateDoc(ref, {
@@ -54,6 +57,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handlePublish = async () => {
+    if (!isAdmin) return;
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { published: true });
     onUpdate({ ...t, published: true });
@@ -61,6 +65,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleStartTournament = async () => {
+    if (!isAdmin) return;
     const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
     const wc = t.defaultWinCondition || "ft3";
     const matches = bracketGen(t.participants, t.maxParticipants, wc);
@@ -75,6 +80,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex }) => {
+    if (!isAdmin) return;
     const matchIndex = t.matches.findIndex((m) => m.id === match.id);
     const winner = winnerIndex === 0 ? match.player1 : match.player2;
     const matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
@@ -85,6 +91,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleUpdateAllWinConditions = async (condition) => {
+    if (!isAdmin) return;
     const ref = doc(db, "tournaments", t.id);
     if (t.matches && t.matches.length > 0) {
       const updatedMatches = t.matches.map((match) => ({
@@ -101,6 +108,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleUpdateMatchWinCondition = async (match, condition) => {
+    if (!isAdmin) return;
     const matchIndex = t.matches.findIndex((m) => m.id === match.id);
     const updatedMatches = t.matches.map((m, i) =>
       i === matchIndex ? { ...m, winCondition: condition } : m
@@ -113,6 +121,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handleAddParticipant = async (e) => {
     e.preventDefault();
+    if (!isAdmin) return;
     const name = addParticipantName.trim();
     if (!name) return;
     const id = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
@@ -130,6 +139,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleAddFakeUsers = async () => {
+    if (!isAdmin) return;
     const numWords = [
       "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
       "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
@@ -155,6 +165,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleResetBracket = async () => {
+    if (!isAdmin) return;
     if (!confirm("Are you sure you want to reset the bracket? All matches will be cleared.")) return;
     const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
     const wc = t.defaultWinCondition || "ft3";
@@ -166,6 +177,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleDelete = async () => {
+    if (!isAdmin) return;
     logEvent({ action: "delete_tournament", details: { tournamentId: t.id, adminId: user.uid } });
     onDelete(t.id);
   };

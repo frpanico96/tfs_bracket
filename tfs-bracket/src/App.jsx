@@ -11,6 +11,7 @@ import {
   onSnapshot,
   doc,
   deleteDoc,
+  getDoc,
 } from "./firebase";
 import "./App.css";
 import Header from "./components/Header";
@@ -56,7 +57,10 @@ function App() {
   };
 
   const handleDeleteTournament = async (tournamentId) => {
+    if (!user) return;
     const ref = doc(db, "tournaments", tournamentId);
+    const snap = await getDoc(ref);
+    if (!snap.exists() || snap.data().adminId !== user.uid) return;
     await deleteDoc(ref);
     setView("list");
     setSelectedTournament(null);

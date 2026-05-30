@@ -171,3 +171,43 @@ Total: 107 tests across 11 files
 ### Changes:
 - `src/components/TournamentDetail.jsx`: Added `showAddParticipant` state, `addParticipantName`/`addParticipantEmail` state, `handleAddParticipant` handler, "Add Participant" button in participants-actions, `BaseModal` with form
 - `src/App.css`: Added `.modal-field` styles for form inputs inside modals
+
+## Iteration 4: Security Hardening
+
+### Feature: Client-Side Authorization Guards
+- **Admin guards**: Added `if (!isAdmin) return;` check at the top of every mutation handler in `TournamentDetail.jsx` — publish, start, saveScore, updateAllWinConditions, updateMatchWinCondition, addParticipant, addFakeUsers, resetBracket, delete
+- **Join validation**: `handleJoin` now checks published status, duplicate join, and capacity before executing (defense in depth beyond UI-only gates)
+- **Delete guard**: `handleDeleteTournament` in `App.jsx` now fetches the document and verifies `adminId === user.uid` before deleting
+- **isAdmin null guard**: Changed from `user.uid === t.adminId` to `user?.uid && t?.adminId && user.uid === t.adminId` to handle edge cases
+- **Input validation**: `CreateTournament.jsx` validates name length (≤100), maxParticipants range (2-64), and regEnd > regStart before submitting
+- **Firestore export**: Added `getDoc` to `firebase.js` exports (needed for delete guard)
+- **Dev onboarding**: Created `.env.example` with placeholder values
+
+### Changes:
+- `src/components/TournamentDetail.jsx`: `isAdmin` null guard; auth check in handleJoin/handlePublish/handleStartTournament/handleSaveScore/handleUpdateAllWinConditions/handleUpdateMatchWinCondition/handleAddParticipant/handleAddFakeUsers/handleResetBracket/handleDelete
+- `src/App.jsx`: `handleDeleteTournament` now fetches doc and verifies admin ownership before delete
+- `src/firebase.js`: Added `getDoc` to imports and exports
+- `src/components/CreateTournament.jsx`: Input validation for name length, maxParticipants, date ordering
+- `.env.example`: Created for developer onboarding
+
+### Updated Firestore Security Rules (for Firebase Console)
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /tournaments/{tournamentId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.adminId == request.auth.uid;
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.adminId;
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.adminId;
+    }
+    match /logs/{logId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+    }
+  }
+}
+```
