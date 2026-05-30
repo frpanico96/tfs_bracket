@@ -7,6 +7,7 @@ import {
   db,
   tournamentsRef,
   query,
+  where,
   orderBy,
   onSnapshot,
   doc,
@@ -33,7 +34,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const q = query(tournamentsRef, orderBy("createdAt", "desc"));
+    if (loading) return;
+
+    const constraints = isGlobalAdmin
+      ? [orderBy("createdAt", "desc")]
+      : [where("published", "==", true), orderBy("createdAt", "desc")];
+
+    const q = query(tournamentsRef, ...constraints);
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -42,7 +49,7 @@ function App() {
       setTournaments(data);
     });
     return () => unsubscribe();
-  }, []);
+  }, [loading, isGlobalAdmin]);
 
   const handleLogin = async () => {
     try {
