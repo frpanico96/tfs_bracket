@@ -86,10 +86,11 @@ function App() {
   };
 
   if (!user) {
+    const version = import.meta.env.VITE_APP_VERSION || "beta-v0.1";
     return (
       <div className="login-container">
         <div className="login-box">
-          <h1>TFS Bracket</h1>
+          <h1>TFS Bracket <span className="version-badge">{version}</span></h1>
           <p>Create and manage tournament brackets</p>
           <button className="btn-primary" onClick={handleLogin}>
             Sign in with Google

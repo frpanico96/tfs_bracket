@@ -12,7 +12,7 @@ const mockUser = {
 describe("Header", () => {
   it("renders the app title", () => {
     render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
-    expect(screen.getByText("TFS Bracket")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /TFS Bracket/ })).toBeInTheDocument();
   });
 
   it("renders user display name", () => {
@@ -38,7 +38,7 @@ describe("Header", () => {
     const onLogoClick = vi.fn();
     const user = userEvent.setup();
     render(<Header user={mockUser} onLogout={() => {}} onLogoClick={onLogoClick} />);
-    await user.click(screen.getByText("TFS Bracket"));
+    await user.click(screen.getByRole("heading", { name: /TFS Bracket/ }));
     expect(onLogoClick).toHaveBeenCalledTimes(1);
   });
 
@@ -79,5 +79,10 @@ describe("Header", () => {
     render(<Header user={mockUser} isSuperAdmin={true} onLogout={() => {}} onLogoClick={() => {}} onInvite={onInvite} />);
     await user.click(screen.getByText("+ Invite"));
     expect(onInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders version badge", () => {
+    render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.getByText("beta-v0.1")).toBeInTheDocument();
   });
 });
