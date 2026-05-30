@@ -12,7 +12,7 @@ vi.mock("../firebase", () => ({
 const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
 vi.mock("../utils/logger", () => ({ logEvent }));
 
-const CreateTournament = (await import("./CreateTournament")).default;
+const CreateTournament = (await import("../components/CreateTournament")).default;
 
 const mockUser = { uid: "user-1", displayName: "Test User" };
 

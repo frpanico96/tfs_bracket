@@ -10,7 +10,7 @@ vi.mock("../firebase", () => ({
   serverTimestamp: mockServerTimestamp,
 }));
 
-const { logEvent } = await import("./logger");
+const { logEvent } = await import("../utils/logger");
 
 describe("logEvent", () => {
   beforeEach(() => {

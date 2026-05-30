@@ -130,60 +130,20 @@ bracketType: string ("single" | "double")  # Added to tournaments collection
 - **MatchCard clickability**: Was only checking `player2 === "BYE"` (single elim convention). Fixed to check both player slots for BYE, and to handle null players.
 
 ### Testing
-1. Create a tournament with "Double Elimination" type
-2. Add participants (need power of 2 for clean bracket, e.g., 4 or 8)
-3. Start tournament → verify winners + losers brackets render
-4. Record scores in WB → verify losers drop to LB
-5. Complete LB → verify LB champion reaches GF
-6. Test GF reset: if LB champion wins GF match 1, verify reset match activates
-
-## Refactoring (Completed)
-All code has been split into reusable components following best practices:
-
-### Directory Structure
-```
-src/
-├── components/
-│   ├── Header.jsx              # App header with user info
-│   ├── TournamentList.jsx     # Tournament listing view
-│   ├── CreateTournament.jsx   # Tournament creation form
-│   ├── TournamentDetail.jsx   # Tournament detail view
-│   ├── BracketView.jsx        # Bracket visualization (clickable matches)
-│   ├── TournamentSidebar.jsx  # Page-level sidebar (extensible for multiple features)
-│   ├── BaseModal.jsx          # Reusable modal component (extended for specific features)
-│   ├── MatchScoreModal.jsx    # Score recording modal (extends BaseModal)
-│   └── PlayerColumn.jsx       # Player profile + score buttons (used in MatchScoreModal)
-├── utils/
-│   ├── bracket.js             # Bracket generation + date parsing
-│   └── logger.js             # Logging utility
-├── App.jsx                    # Main app with auth + routing
-├── firebase.js               # Firebase config + exports
-├── App.css                    # Component styles
-└── index.css                 # Global styles
-```
-
-### New Development Approach
-- Always create new components in `src/components/`
-- Keep utility functions in `src/utils/`
-- Import firebase from `../firebase` relative path
-- Write tests alongside source files as `*.test.js` or `*.test.jsx`
-- Mock Firebase modules in component tests using `vi.mock("../firebase")`
-
-## Testing
 - **Framework**: Vitest (v4) with jsdom environment
 - **Libraries**: @testing-library/react, @testing-library/jest-dom, @testing-library/user-event
 - **Setup**: `src/test/setup.js` (imports jest-dom matchers)
+- **Location**: All test files in `src/test/` (Vitest discovers via `**/*.test.*` glob)
 - **Scripts**: `npm test` (run once), `npm run test:watch` (watch mode)
 
 ### Test Files
 ```
 src/
-├── utils/
-│   ├── bracket.js
-│   ├── bracket.test.js          # 33 tests (generation, advance, reset, utils)
-│   ├── logger.js
-│   └── logger.test.js           # 5 tests (Firebase addDoc mocking)
-└── components/
+├── components/       # UI components
+├── utils/            # Utility functions
+├── test/             # Test files (Vitest)
+    ├── bracket.test.js          # 33 tests (generation, advance, reset, utils)
+    ├── logger.test.js           # 5 tests (Firebase addDoc mocking)
     ├── Header.test.jsx          # 5 tests
     ├── BaseModal.test.jsx       # 5 tests
     ├── PlayerColumn.test.jsx    # 8 tests
@@ -191,9 +151,23 @@ src/
     ├── BracketView.test.jsx     # 11 tests (single/double elim rendering)
     ├── MatchScoreModal.test.jsx # 9 tests (score entry, validation)
     ├── TournamentSidebar.test.jsx # 4 tests
-    └── CreateTournament.test.jsx  # 5 tests
-Total: 97 tests across 10 files
+    ├── CreateTournament.test.jsx  # 5 tests
+    └── TournamentDetail.test.jsx  # 10 tests (manual participant addition)
+Total: 107 tests across 11 files
 ```
 
 ### Bug Fix: advanceBracket single elim propagation
 `advanceBracket` in `bracket.js` was checking `m.bracket === 'winners'` in the propagation loop, but single elimination matches don't have a `bracket` property. Fixed by adding `!m.bracket ||` to the condition so single elim winners propagate correctly. Discovered via unit tests.
+
+## Iteration 3: Manual Participant Addition (Admin)
+
+### Feature: Admin Can Manually Add Participants
+- **Purpose**: UAT phase — the testing admin needs to add participants manually instead of relying on self-registration
+- **Modal**: Uses `BaseModal` with a form containing Name (required) + Email (optional) fields
+- **ID Generation**: Participants get a unique `manual-{timestamp}-{random}` ID (no Firebase Auth UID needed)
+- **Visibility**: Button shows for the admin as long as the tournament hasn't started (not gated by `isDev`)
+- **Edge cases**: Form validates non-empty name; email auto-generated if omitted; modal state resets on close
+
+### Changes:
+- `src/components/TournamentDetail.jsx`: Added `showAddParticipant` state, `addParticipantName`/`addParticipantEmail` state, `handleAddParticipant` handler, "Add Participant" button in participants-actions, `BaseModal` with form
+- `src/App.css`: Added `.modal-field` styles for form inputs inside modals

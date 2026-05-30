@@ -32,6 +32,9 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [matchWinConditionEdit, setMatchWinConditionEdit] = useState(null);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [addParticipantName, setAddParticipantName] = useState("");
+  const [addParticipantEmail, setAddParticipantEmail] = useState("");
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -106,6 +109,24 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     await updateDoc(ref, { matches: updatedMatches });
     onUpdate({ ...t, matches: updatedMatches });
     logEvent({ action: "update_match_win_condition", details: { tournamentId: t.id, matchId: match.id, newCondition: condition, previousCondition: match.winCondition } });
+  };
+
+  const handleAddParticipant = async (e) => {
+    e.preventDefault();
+    const name = addParticipantName.trim();
+    if (!name) return;
+    const id = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const email = addParticipantEmail.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@manual.local`;
+    const newParticipant = { id, name, email };
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, {
+      participants: [...t.participants, newParticipant],
+    });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    logEvent({ action: "add_manual_participant", details: { tournamentId: t.id, participantName: name, participantId: id } });
+    setAddParticipantName("");
+    setAddParticipantEmail("");
+    setShowAddParticipant(false);
   };
 
   const handleAddFakeUsers = async () => {
@@ -214,6 +235,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             {canJoin && (
               <button className="btn-primary" onClick={handleJoin}>
                 Join Tournament
+              </button>
+            )}
+            {isAdmin && !t.started && (
+              <button className="btn-secondary" onClick={() => setShowAddParticipant(true)}>
+                + Add Participant
               </button>
             )}
             {isDev && isAdmin && (
@@ -333,6 +359,43 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             </button>
           ))}
         </div>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={showAddParticipant}
+        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}
+        title="Add Participant"
+      >
+        <form onSubmit={handleAddParticipant}>
+          <label className="modal-field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={addParticipantName}
+              onChange={(e) => setAddParticipantName(e.target.value)}
+              placeholder="Player name"
+              autoFocus
+              required
+            />
+          </label>
+          <label className="modal-field">
+            <span>Email (optional)</span>
+            <input
+              type="email"
+              value={addParticipantEmail}
+              onChange={(e) => setAddParticipantEmail(e.target.value)}
+              placeholder="player@example.com"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={!addParticipantName.trim()}>
+              Add
+            </button>
+          </div>
+        </form>
       </BaseModal>
     </div>
   );

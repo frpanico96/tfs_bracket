@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import BracketView from "./BracketView";
+import BracketView from "../components/BracketView";
 
 const singleElimMatches = [
   { id: "r1-m0", round: 1, matchIndex: 0, player1: "Alice", player2: "Bob", winner: null, isPlayed: false, prevMatch1: null, prevMatch2: null, winCondition: "ft3", scoreP1: 0, scoreP2: 0 },

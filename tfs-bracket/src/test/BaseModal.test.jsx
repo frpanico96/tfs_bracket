@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import BaseModal from "./BaseModal";
+import BaseModal from "../components/BaseModal";
 
 describe("BaseModal", () => {
   it("renders nothing when isOpen is false", () => {

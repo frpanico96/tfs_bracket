@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import MatchScoreModal from "./MatchScoreModal";
+import MatchScoreModal from "../components/MatchScoreModal";
 
 const match = {
   id: "r1-m0",

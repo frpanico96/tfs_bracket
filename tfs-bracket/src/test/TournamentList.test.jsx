@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import TournamentList from "./TournamentList";
+import TournamentList from "../components/TournamentList";
 
 const futureDate = new Date(Date.now() + 86400000);
 const pastDate = new Date(Date.now() - 86400000);

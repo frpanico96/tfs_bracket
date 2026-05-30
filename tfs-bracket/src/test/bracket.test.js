@@ -7,7 +7,7 @@ import {
   parseFirestoreDate,
   resetBracket,
   isDoubleBracket,
-} from "./bracket";
+} from "../utils/bracket";
 
 function makeParticipants(n) {
   return Array.from({ length: n }, (_, i) => ({
