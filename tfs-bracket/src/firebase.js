@@ -23,6 +23,7 @@ export const logOut = () => signOut(auth);
 export const tournamentsRef = collection(db, "tournaments");
 export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "logs");
+export const invitesRef = collection(db, "invites");
 
 export {
   addDoc,

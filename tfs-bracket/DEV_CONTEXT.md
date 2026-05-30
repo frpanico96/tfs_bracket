@@ -242,3 +242,43 @@ service cloud.firestore {
 ```
 Total: 110 tests across 11 files
 ```
+
+## Iteration 6: Invite System & Tournament Admin Role
+
+### Feature: Role-Based Invite Links
+- **New role `tournament_admin`**: Can create and manage tournaments but cannot use the invite functionality (reserved for `admin` super admins)
+- **Invite generation**: Super admins (`VITE_ADMINS`) see an "Invite" button in the Header → opens `InviteModal` → enter @gmail.com email + select role (Tournament Admin / Player) → generates unique invite link → copy to clipboard
+- **Invite processing**: `useUserRole` reads `?invite=TOKEN` query param on page load → fetches invite from Firestore `invites` collection → validates (not used, email match) → updates user role → marks invite as consumed
+- **Invite banner**: Shows success/error message on the tournament list page after invite processing
+- **Role hierarchy**: `admin` (super, from VITE_ADMINS) > `tournament_admin` (can create/manage) > `player` (view only)
+
+### Changes:
+- `src/hooks/useUserRole.js`: Added `isSuperAdmin` return, `inviteToken` parameter, invite processing logic; `isGlobalAdmin` now includes `tournament_admin`
+- `src/utils/invite.js`: New file with `createInvite`, `getInviteByToken`, `consumeInvite`, `buildInviteLink`, `INVITE_ROLES`
+- `src/components/InviteModal.jsx`: New component — modal with email input, role selector, link generation, copy-to-clipboard
+- `src/components/Header.jsx`: Added `isSuperAdmin` and `onInvite` props, "Invite" button
+- `src/App.jsx`: Reads invite query param, passes to hook, shows invite banner, renders InviteModal
+- `src/firebase.js`: Added `invitesRef` export
+- `src/App.css`: Added `.role-badge.role-tournament_admin`, `.header-actions`, `.btn-invite`, `.invite-banner`, `.invite-link-box`, `.invite-error/success/hint`
+- `.env.example`: No changes needed (existing `VITE_ADMINS` is sufficient)
+
+### Firestore Schema Update
+```
+Collection: invites
+  token: string (unique, via crypto.randomUUID())
+  email: string (lowercase)
+  role: string ("tournament_admin" | "player")
+  used: boolean
+  createdBy: string (uid)
+  createdByName: string
+  createdAt: timestamp
+```
+
+### Firestore Rules Update
+```
+match /invites/{inviteId} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null;
+  allow update: if request.auth != null;
+}
+```

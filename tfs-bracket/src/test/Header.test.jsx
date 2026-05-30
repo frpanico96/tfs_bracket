@@ -41,4 +41,43 @@ describe("Header", () => {
     await user.click(screen.getByText("TFS Bracket"));
     expect(onLogoClick).toHaveBeenCalledTimes(1);
   });
+
+  it("renders role badge when role is provided", () => {
+    render(<Header user={mockUser} role="admin" onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+  });
+
+  it("does not render role badge when role is not provided", () => {
+    render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
+    expect(screen.queryByText("Player")).not.toBeInTheDocument();
+  });
+
+  it("formats tournament_admin role display", () => {
+    render(<Header user={mockUser} role="tournament_admin" onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.getByText("Tournament Admin")).toBeInTheDocument();
+  });
+
+  it("shows Invite button when isSuperAdmin is true", () => {
+    render(<Header user={mockUser} isSuperAdmin={true} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.getByText("+ Invite")).toBeInTheDocument();
+  });
+
+  it("hides Invite button when isSuperAdmin is false", () => {
+    render(<Header user={mockUser} isSuperAdmin={false} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.queryByText("+ Invite")).not.toBeInTheDocument();
+  });
+
+  it("hides Invite button when isSuperAdmin is not provided", () => {
+    render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(screen.queryByText("+ Invite")).not.toBeInTheDocument();
+  });
+
+  it("calls onInvite when Invite button is clicked", async () => {
+    const onInvite = vi.fn();
+    const user = userEvent.setup();
+    render(<Header user={mockUser} isSuperAdmin={true} onLogout={() => {}} onLogoClick={() => {}} onInvite={onInvite} />);
+    await user.click(screen.getByText("+ Invite"));
+    expect(onInvite).toHaveBeenCalledTimes(1);
+  });
 });
