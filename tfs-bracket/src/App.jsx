@@ -6,22 +6,32 @@ import {
   auth,
   db,
   tournamentsRef,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  onSnapshot,
-  serverTimestamp,
   query,
-  orderBy,
+  where,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  getDoc,
 } from "./firebase";
 import "./App.css";
+import Header from "./components/Header";
+import TournamentList from "./components/TournamentList";
+import CreateTournament from "./components/CreateTournament";
+import TournamentDetail from "./components/TournamentDetail";
+import InviteModal from "./components/InviteModal";
+import useUserRole from "./hooks/useUserRole";
 
 function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("list");
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("invite") || null;
+  });
+  const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized } = useUserRole(user, inviteToken);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
@@ -29,16 +39,27 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const q = query(tournamentsRef, orderBy("createdAt", "desc"));
+    if (loading) return;
+
+    const constraints = isGlobalAdmin
+      ? []
+      : [where("published", "==", true)];
+
+    const q = query(tournamentsRef, ...constraints);
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+      data.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() ?? 0;
+        const bTime = b.createdAt?.toMillis?.() ?? 0;
+        return bTime - aTime;
+      });
       setTournaments(data);
     });
     return () => unsubscribe();
-  }, []);
+  }, [loading, isGlobalAdmin]);
 
   const handleLogin = async () => {
     try {
@@ -50,6 +71,16 @@ function App() {
 
   const handleLogout = async () => {
     await logOut();
+    setView("list");
+    setSelectedTournament(null);
+  };
+
+  const handleDeleteTournament = async (tournamentId) => {
+    if (!user) return;
+    const ref = doc(db, "tournaments", tournamentId);
+    const snap = await getDoc(ref);
+    if (!snap.exists() || snap.data().adminId !== user.uid) return;
+    await deleteDoc(ref);
     setView("list");
     setSelectedTournament(null);
   };
@@ -68,34 +99,74 @@ function App() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="app">
+        <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+        <main className="main">
+          <p className="empty">Loading...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (isAuthorized === false) {
+    return (
+      <div className="app">
+        <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+        <main className="main">
+          <div className="access-denied">
+            <h2>Access Restricted</h2>
+            <p>This application is currently in private testing.</p>
+            <p>You need an invitation link to access it.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Non-admin trying to access create view: redirect to list
+  if (view === "create" && !isGlobalAdmin) {
+    setView("list");
+  }
+
   return (
     <div className="app">
-      <header className="header">
-        <h1 onClick={() => setView("list")} style={{ cursor: "pointer" }}>
-          TFS Bracket
-        </h1>
-        <div className="user-info">
-          <img src={user.photoURL} alt="" className="avatar" />
-          <span>{user.displayName}</span>
-          <button className="btn-secondary" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </header>
+      <Header
+        user={user}
+        role={role}
+        isSuperAdmin={isSuperAdmin}
+        onLogout={handleLogout}
+        onLogoClick={() => setView("list")}
+        onInvite={() => setShowInviteModal(true)}
+      />
 
-      <main className="main">
+      <main className={`main ${view === "detail" ? "main-full" : ""}`}>
+        {inviteResult && (
+          <div className={`invite-banner invite-${inviteResult.success ? "success" : "error"}`}>
+            {inviteResult.success
+              ? `Invite accepted! You are now registered as ${inviteResult.role.replace("_", " ")}.`
+              : inviteResult.reason === "invalid"
+              ? "This invite link is invalid or has already been used."
+              : inviteResult.reason === "error"
+              ? "Failed to process invite. Check the console or try again."
+              : "This invite was sent to a different email address."}
+          </div>
+        )}
         {view === "list" && (
           <TournamentList
             tournaments={tournaments}
             user={user}
+            isGlobalAdmin={isGlobalAdmin}
             onSelect={(t) => {
               setSelectedTournament(t);
               setView("detail");
             }}
             onCreate={() => setView("create")}
+            onDelete={handleDeleteTournament}
           />
         )}
-        {view === "create" && (
+        {view === "create" && isGlobalAdmin && (
           <CreateTournament
             user={user}
             onCancel={() => setView("list")}
@@ -111,392 +182,19 @@ function App() {
             user={user}
             onBack={() => setView("list")}
             onUpdate={(t) => setSelectedTournament(t)}
+            onDelete={handleDeleteTournament}
           />
         )}
       </main>
-    </div>
-  );
-}
 
-function TournamentList({ tournaments, user, onSelect, onCreate }) {
-  const now = new Date();
-
-  return (
-    <div className="tournament-list">
-      <div className="list-header">
-        <h2>Tournaments</h2>
-        <button className="btn-primary" onClick={onCreate}>
-          + Create Tournament
-        </button>
-      </div>
-      {tournaments.length === 0 ? (
-        <p className="empty">No tournaments yet. Create one!</p>
-      ) : (
-        <div className="cards">
-          {tournaments.map((t) => {
-            const canJoin =
-              t.published &&
-              t.participants.length < t.maxParticipants &&
-              new Date(t.regEnd) > now;
-            return (
-              <div key={t.id} className="card" onClick={() => onSelect(t)}>
-                <h3>{t.name}</h3>
-                <p>
-                  {t.participants.length}/{t.maxParticipants} players
-                </p>
-                <p>
-                  {t.published ? "Published" : "Draft"} • Reg:{" "}
-                  {new Date(t.regStart).toLocaleDateString()} -{" "}
-                  {new Date(t.regEnd).toLocaleDateString()}
-                </p>
-                {canJoin && (
-                  <span className="badge-green">Join Open</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CreateTournament({ user, onCancel, onCreated }) {
-  const [name, setName] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState(8);
-  const [regStart, setRegStart] = useState("");
-  const [regEnd, setRegEnd] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!name || !regStart || !regEnd) {
-      alert("Please fill all fields");
-      return;
-    }
-    try {
-      const docRef = await addDoc(tournamentsRef, {
-        name,
-        maxParticipants: parseInt(maxParticipants),
-        regStart: new Date(regStart),
-        regEnd: new Date(regEnd),
-        createdAt: serverTimestamp(),
-        adminId: user.uid,
-        adminName: user.displayName,
-        published: false,
-        participants: [],
-        matches: [],
-      });
-      onCreated({ id: docRef.id, name, maxParticipants, regStart, regEnd });
-    } catch (error) {
-      console.error("Create failed:", error);
-      alert("Failed to create tournament: " + error.message);
-    }
-  };
-
-  return (
-    <div className="create-tournament">
-      <h2>Create Tournament</h2>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Tournament Name
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My Tournament"
-            required
-          />
-        </label>
-        <label>
-          Max Participants
-          <select
-            value={maxParticipants}
-            onChange={(e) => setMaxParticipants(e.target.value)}
-          >
-            <option value={4}>4</option>
-            <option value={8}>8</option>
-            <option value={16}>16</option>
-            <option value={32}>32</option>
-          </select>
-        </label>
-        <label>
-          Registration Start
-          <input
-            type="datetime-local"
-            value={regStart}
-            onChange={(e) => setRegStart(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Registration End
-          <input
-            type="datetime-local"
-            value={regEnd}
-            onChange={(e) => setRegEnd(e.target.value)}
-            required
-          />
-        </label>
-        <div className="buttons">
-          <button type="button" className="btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="btn-primary">
-            Create
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function TournamentDetail({ tournament, user, onBack, onUpdate }) {
-  const isDev = import.meta.env.DEV;
-  const isAdmin = user.uid === tournament.adminId;
-  const now = new Date();
-  const regOpen =
-    tournament.published &&
-    new Date(tournament.regStart) <= now &&
-    new Date(tournament.regEnd) > now;
-  const canJoin =
-    regOpen &&
-    !tournament.participants.some((p) => p.id === user.uid) &&
-    tournament.participants.length < tournament.maxParticipants;
-
-  const handleJoin = async () => {
-    const ref = doc(db, "tournaments", tournament.id);
-    await updateDoc(ref, {
-      participants: [
-        ...tournament.participants,
-        { id: user.uid, name: user.displayName, email: user.email },
-      ],
-    });
-    onUpdate({
-      ...tournament,
-      participants: [
-        ...tournament.participants,
-        { id: user.uid, name: user.displayName, email: user.email },
-      ],
-    });
-  };
-
-  const handlePublish = async () => {
-    const ref = doc(db, "tournaments", tournament.id);
-    await updateDoc(ref, { published: true });
-    onUpdate({ ...tournament, published: true });
-  };
-
-  const handleStartTournament = async () => {
-    const matches = generateBracket(tournament.participants, tournament.maxParticipants);
-    const ref = doc(db, "tournaments", tournament.id);
-    await updateDoc(ref, { matches, started: true });
-    onUpdate({ ...tournament, matches, started: true });
-  };
-
-  const handleUpdateMatch = async (matchIndex, winnerIndex) => {
-    const matches = [...tournament.matches];
-    matches[matchIndex].winner = winnerIndex;
-    const ref = doc(db, "tournaments", tournament.id);
-    await updateDoc(ref, { matches });
-    onUpdate({ ...tournament, matches });
-  };
-
-  const handleAddFakeUsers = async () => {
-    const fakeNames = [
-      "Player One", "Player Two", "Player Three", "Player Four",
-      "Player Five", "Player Six", "Player Seven", "Player Eight",
-    ];
-    const currentCount = tournament.participants.length;
-    const slotsAvailable = tournament.maxParticipants - currentCount;
-    const toAdd = fakeNames.slice(0, slotsAvailable).map((name, i) => ({
-      id: `fake-${currentCount + i}`,
-      name,
-      email: `${name.toLowerCase().replace(" ", "-")}@example.com`,
-    }));
-    const ref = doc(db, "tournaments", tournament.id);
-    await updateDoc(ref, {
-      participants: [...tournament.participants, ...toAdd],
-    });
-    onUpdate({ ...tournament, participants: [...tournament.participants, ...toAdd] });
-  };
-
-  return (
-    <div className="tournament-detail">
-      <button className="btn-back" onClick={onBack}>
-        ← Back
-      </button>
-      <div className="detail-header">
-        <h2>{tournament.name}</h2>
-        {isAdmin && !tournament.published && (
-          <button className="btn-primary" onClick={handlePublish}>
-            Publish
-          </button>
-        )}
-      </div>
-
-      <div className="detail-info">
-        <p>
-          <strong>Admin:</strong> {tournament.adminName}
-        </p>
-        <p>
-          <strong>Registration:</strong> {new Date(tournament.regStart).toLocaleString()} -{" "}
-          {new Date(tournament.regEnd).toLocaleString()}
-        </p>
-        <p>
-          <strong>Status:</strong>{" "}
-          {tournament.started
-            ? "In Progress"
-            : tournament.published
-            ? "Open"
-            : "Draft"}
-        </p>
-      </div>
-
-      {!tournament.started && (
-        <div className="participants-section">
-          <h3>
-            Participants ({tournament.participants.length}/{tournament.maxParticipants})
-          </h3>
-          {tournament.participants.length === 0 ? (
-            <p className="empty">No participants yet</p>
-          ) : (
-            <ul className="participants-list">
-              {tournament.participants.map((p, i) => (
-                <li key={i}>
-                  {i + 1}. {p.name}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canJoin && (
-            <button className="btn-primary" onClick={handleJoin}>
-              Join Tournament
-            </button>
-          )}
-          {isDev && isAdmin && (
-              <button className="btn-secondary" onClick={handleAddFakeUsers}>
-                + Add Fake Users
-              </button>
-            )}
-            {isAdmin &&
-              tournament.published &&
-              tournament.participants.length >= 2 &&
-              !tournament.started && (
-                <button className="btn-primary" onClick={handleStartTournament}>
-                  Start Tournament
-                </button>
-              )}
-        </div>
-      )}
-
-      {tournament.started && tournament.matches && (
-        <BracketView
-          matches={tournament.matches}
-          onUpdateMatch={handleUpdateMatch}
-          isAdmin={isAdmin}
+      {showInviteModal && (
+        <InviteModal
+          user={user}
+          onClose={() => setShowInviteModal(false)}
         />
       )}
     </div>
   );
-}
-
-function BracketView({ matches, onUpdateMatch, isAdmin }) {
-  if (!matches || matches.length === 0) {
-    return <p className="empty">No matches yet</p>;
-  }
-
-  const rounds = groupByRound(matches);
-
-  return (
-    <div className="bracket">
-      <h3>Bracket</h3>
-      <div className="bracket-rounds">
-        {rounds.map((roundMatches, roundIndex) => (
-          <div key={roundIndex} className="round">
-            <h4>Round {roundIndex + 1}</h4>
-            {roundMatches.map((match, i) => {
-              const matchIndex = matches.indexOf(match);
-              return (
-                <div
-                  key={i}
-                  className={`match ${match.winner !== null ? "completed" : ""}`}
-                >
-                  <div className="match-row">
-                    <span
-                      className={
-                        match.winner === 0 ? "winner" : ""
-                      }
-                    >
-                      {match.player1 || "TBD"}
-                    </span>
-                    {isAdmin && match.winner === null && (
-                      <button
-                        className="btn-small"
-                        onClick={() => onUpdateMatch(matchIndex, 0)}
-                      >
-                        Win
-                      </button>
-                    )}
-                  </div>
-                  <div className="match-row">
-                    <span
-                      className={
-                        match.winner === 1 ? "winner" : ""
-                      }
-                    >
-                      {match.player2 || "TBD"}
-                    </span>
-                    {isAdmin && match.winner === null && (
-                      <button
-                        className="btn-small"
-                        onClick={() => onUpdateMatch(matchIndex, 1)}
-                      >
-                        Win
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function generateBracket(participants, max) {
-  const shuffled = [...participants].sort(() => Math.random() - 0.5);
-  const players = shuffled.slice(0, max);
-  const matches = [];
-
-  for (let i = 0; i < players.length; i += 2) {
-    if (players[i + 1]) {
-      matches.push({
-        round: 1,
-        player1: players[i].name,
-        player2: players[i + 1].name,
-        winner: null,
-      });
-    } else {
-      matches.push({
-        round: 1,
-        player1: players[i].name,
-        player2: "BYE",
-        winner: 0,
-      });
-    }
-  }
-  return matches;
-}
-
-function groupByRound(matches) {
-  const rounds = [];
-  matches.forEach((m) => {
-    if (!rounds[m.round - 1]) rounds[m.round - 1] = [];
-    rounds[m.round - 1].push(m);
-  });
-  return rounds;
 }
 
 export default App;

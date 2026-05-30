@@ -1,0 +1,418 @@
+import { useState, useEffect } from "react";
+import { db, doc, updateDoc } from "../firebase";
+import { generateBracket, generateDoubleEliminationBracket, advanceBracket, parseFirestoreDate } from "../utils/bracket";
+import { logEvent } from "../utils/logger";
+import BracketView from "./BracketView";
+import TournamentSidebar from "./TournamentSidebar";
+import MatchScoreModal from "./MatchScoreModal";
+import BaseModal from "./BaseModal";
+
+const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
+
+export default function TournamentDetail({ tournament, user, onBack, onUpdate, onDelete }) {
+  const t = tournament;
+  
+  const isDev = import.meta.env.DEV;
+  const isAdmin = user?.uid && t?.adminId && user.uid === t.adminId;
+  const now = new Date();
+  const regStartDate = parseFirestoreDate(t.regStart);
+  const regEndDate = parseFirestoreDate(t.regEnd);
+  const regOpen =
+    t.published &&
+    regStartDate &&
+    regEndDate &&
+    regStartDate <= now &&
+    regEndDate > now;
+  const canJoin =
+    regOpen &&
+    !t.participants.some((p) => p.id === user.uid) &&
+    t.participants.length < t.maxParticipants;
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [matchWinConditionEdit, setMatchWinConditionEdit] = useState(null);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [addParticipantName, setAddParticipantName] = useState("");
+  const [addParticipantEmail, setAddParticipantEmail] = useState("");
+
+  useEffect(() => {
+    const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleJoin = async () => {
+    if (!t.published) return;
+    if (t.participants.some((p) => p.id === user.uid)) return;
+    if (t.participants.length >= t.maxParticipants) return;
+    const ref = doc(db, "tournaments", t.id);
+    const newParticipant = { id: user.uid, name: user.displayName, email: user.email };
+    await updateDoc(ref, {
+      participants: [...t.participants, newParticipant],
+    });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: user.displayName } });
+  };
+
+  const handlePublish = async () => {
+    if (!isAdmin) return;
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { published: true });
+    onUpdate({ ...t, published: true });
+    logEvent({ action: "publish_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+  };
+
+  const handleStartTournament = async () => {
+    if (!isAdmin) return;
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    const wc = t.defaultWinCondition || "ft3";
+    const matches = bracketGen(t.participants, t.maxParticipants, wc);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches, started: true });
+    onUpdate({ ...t, matches, started: true });
+    logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
+  };
+
+  const handleMatchClick = (match) => {
+    setSelectedMatch(match);
+  };
+
+  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex }) => {
+    if (!isAdmin) return;
+    if (typeof p1Score !== "number" || typeof p2Score !== "number" || !Number.isFinite(p1Score) || !Number.isFinite(p2Score) || p1Score < 0 || p2Score < 0) return;
+    if (winnerIndex !== 0 && winnerIndex !== 1) return;
+    const matchIndex = t.matches.findIndex((m) => m.id === match.id);
+    const winner = winnerIndex === 0 ? match.player1 : match.player2;
+    const matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches });
+    onUpdate({ ...t, matches });
+    logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner, round: match.round, score: `${p1Score}-${p2Score}` } });
+  };
+
+  const handleUpdateAllWinConditions = async (condition) => {
+    if (!isAdmin) return;
+    const ref = doc(db, "tournaments", t.id);
+    if (t.matches && t.matches.length > 0) {
+      const updatedMatches = t.matches.map((match) => ({
+        ...match,
+        winCondition: condition,
+      }));
+      await updateDoc(ref, { matches: updatedMatches, defaultWinCondition: condition });
+      onUpdate({ ...t, matches: updatedMatches, defaultWinCondition: condition });
+    } else {
+      await updateDoc(ref, { defaultWinCondition: condition });
+      onUpdate({ ...t, defaultWinCondition: condition });
+    }
+    logEvent({ action: "update_all_win_conditions", details: { tournamentId: t.id, condition } });
+  };
+
+  const handleUpdateMatchWinCondition = async (match, condition) => {
+    if (!isAdmin) return;
+    const matchIndex = t.matches.findIndex((m) => m.id === match.id);
+    const updatedMatches = t.matches.map((m, i) =>
+      i === matchIndex ? { ...m, winCondition: condition } : m
+    );
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches: updatedMatches });
+    onUpdate({ ...t, matches: updatedMatches });
+    logEvent({ action: "update_match_win_condition", details: { tournamentId: t.id, matchId: match.id, newCondition: condition, previousCondition: match.winCondition } });
+  };
+
+  const handleAddParticipant = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const name = addParticipantName.trim();
+    if (!name) return;
+    const rawEmail = addParticipantEmail.trim();
+    if (rawEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) return;
+    const id = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const email = rawEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@manual.local`;
+    const newParticipant = { id, name, email };
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, {
+      participants: [...t.participants, newParticipant],
+    });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    logEvent({ action: "add_manual_participant", details: { tournamentId: t.id, participantName: name, participantId: id } });
+    setAddParticipantName("");
+    setAddParticipantEmail("");
+    setShowAddParticipant(false);
+  };
+
+  const handleAddFakeUsers = async () => {
+    if (!isAdmin) return;
+    const numWords = [
+      "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+      "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
+      "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty",
+    ];
+    const currentCount = t.participants.length;
+    const slotsAvailable = t.maxParticipants - currentCount;
+    const toAdd = Array.from({ length: slotsAvailable }, (_, i) => {
+      const num = currentCount + i + 1;
+      const word = numWords[num - 1] || String(num);
+      return {
+        id: `fake-${currentCount + i}`,
+        name: `Player ${word}`,
+        email: `player${num}@example.com`,
+      };
+    });
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, {
+      participants: [...t.participants, ...toAdd],
+    });
+    onUpdate({ ...t, participants: [...t.participants, ...toAdd] });
+    logEvent({ action: "add_fake_users", details: { tournamentId: t.id, count: toAdd.length } });
+  };
+
+  const handleResetBracket = async () => {
+    if (!isAdmin) return;
+    if (!confirm("Are you sure you want to reset the bracket? All matches will be cleared.")) return;
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    const wc = t.defaultWinCondition || "ft3";
+    const freshMatches = bracketGen(t.participants, t.maxParticipants, wc);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches: freshMatches });
+    onUpdate({ ...t, matches: freshMatches });
+    logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
+  };
+
+  const handleDelete = async () => {
+    if (!isAdmin) return;
+    logEvent({ action: "delete_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+    onDelete(t.id);
+  };
+
+  const getDefaultWinCondition = () => {
+    if (t.defaultWinCondition) return t.defaultWinCondition;
+    if (t.matches && t.matches.length > 0) return t.matches[0].winCondition || "ft3";
+    return "ft3";
+  };
+
+  return (
+    <div className={`tournament-detail ${sidebarOpen ? "with-sidebar" : ""}`}>
+      <div className="detail-content">
+        <div className="detail-header">
+          <h2>{t.name}</h2>
+          {isAdmin && !t.published && (
+            <button className="btn-primary" onClick={handlePublish}>
+              Publish
+            </button>
+          )}
+        </div>
+
+        <div className="detail-info">
+          <p>
+            <strong>Admin:</strong> {t.adminName}
+          </p>
+          <p>
+            <strong>Registration:</strong>{" "}
+            {regStartDate ? regStartDate.toLocaleString() : "TBD"} -{" "}
+            {regEndDate ? regEndDate.toLocaleString() : "TBD"}
+          </p>
+          <p>
+            <strong>Status:</strong>{" "}
+            {t.started
+              ? "In Progress"
+              : t.published
+              ? "Open"
+              : "Draft"}
+          </p>
+        </div>
+
+        {!t.started && (
+          <>
+            <div className="bracket-actions">
+              <button className="btn-secondary" onClick={onBack}>
+                ← Back
+              </button>
+            </div>
+            <div className="participants-section">
+            <h3>
+              Participants ({t.participants.length}/{t.maxParticipants})
+            </h3>
+            <div className="participants-list-scroll">
+            {t.participants.length === 0 ? (
+              <p className="empty">No participants yet</p>
+            ) : (
+              <ul className="participants-list">
+                {t.participants.map((p, i) => (
+                  <li key={i}>
+                    {i + 1}. {p.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+            </div>
+            <div className="participants-actions">
+            {canJoin && (
+              <button className="btn-primary" onClick={handleJoin}>
+                Join Tournament
+              </button>
+            )}
+            {isAdmin && !t.started && (
+              <button className="btn-secondary" onClick={() => setShowAddParticipant(true)}>
+                + Add Participant
+              </button>
+            )}
+            {isDev && isAdmin && (
+                <button className="btn-secondary" onClick={handleAddFakeUsers}>
+                  + Add Fake Users
+                </button>
+              )}
+              {isDev && isAdmin && (
+                <button className="btn-secondary" onClick={() => {
+                  const newMax = prompt("Set max participants:", t.maxParticipants);
+                  if (newMax && !isNaN(newMax) && parseInt(newMax) >= 2) {
+                    const ref = doc(db, "tournaments", t.id);
+                    updateDoc(ref, { maxParticipants: parseInt(newMax) });
+                    onUpdate({ ...t, maxParticipants: parseInt(newMax) });
+                  }
+                }}>
+                  Change Max Players
+                </button>
+              )}
+              {isAdmin && t.published && (
+                <button className="btn-primary" onClick={handleStartTournament} disabled={t.participants.length < 2}>
+                  Start Tournament ({t.participants.length}/{t.maxParticipants})
+                </button>
+              )}
+              </div>
+          </div>
+          </>
+        )}
+
+        {t.started && t.matches && (
+          <>
+            <div className="bracket-actions">
+              <button className="btn-secondary" onClick={onBack}>
+                ← Back
+              </button>
+              {isAdmin && (
+                <button className="btn-secondary" onClick={handleResetBracket}>
+                  Reset Bracket
+                </button>
+              )}
+              {isAdmin && (
+                <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
+                  Delete Tournament
+                </button>
+              )}
+            </div>
+            <BracketView
+              matches={t.matches}
+              onMatchClick={handleMatchClick}
+              isAdmin={isAdmin}
+              bracketType={t.bracketType}
+              onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
+            />
+          </>
+        )}
+      </div>
+
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Tournament</h3>
+              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete "{t.name}"? This action cannot be undone.</p>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </button>
+                <button className="btn-danger" onClick={handleDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <TournamentSidebar
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          currentCondition={getDefaultWinCondition()}
+          onUpdateCondition={handleUpdateAllWinConditions}
+        />
+      )}
+
+      <MatchScoreModal
+        isOpen={!!selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+        match={selectedMatch}
+        onSave={handleSaveScore}
+      />
+
+      <BaseModal
+        isOpen={!!matchWinConditionEdit}
+        onClose={() => setMatchWinConditionEdit(null)}
+        title="Match Win Condition"
+      >
+        <div className="modal-options">
+          {WIN_CONDITIONS.map((condition) => (
+            <button
+              key={condition}
+              className={`modal-option ${matchWinConditionEdit?.winCondition === condition ? "selected" : ""}`}
+              onClick={() => {
+                if (matchWinConditionEdit) {
+                  handleUpdateMatchWinCondition(matchWinConditionEdit, condition);
+                  setMatchWinConditionEdit(null);
+                }
+              }}
+            >
+              {condition.toUpperCase()}
+              <span className="modal-option-desc">
+                First to {condition.replace("ft", "")} wins
+              </span>
+            </button>
+          ))}
+        </div>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={showAddParticipant}
+        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}
+        title="Add Participant"
+      >
+        <form onSubmit={handleAddParticipant}>
+          <label className="modal-field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={addParticipantName}
+              onChange={(e) => setAddParticipantName(e.target.value)}
+              placeholder="Player name"
+              autoFocus
+              required
+            />
+          </label>
+          <label className="modal-field">
+            <span>Email (optional)</span>
+            <input
+              type="email"
+              value={addParticipantEmail}
+              onChange={(e) => setAddParticipantEmail(e.target.value)}
+              placeholder="player@example.com"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={!addParticipantName.trim()}>
+              Add
+            </button>
+          </div>
+        </form>
+      </BaseModal>
+    </div>
+  );
+}
