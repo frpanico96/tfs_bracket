@@ -18,12 +18,14 @@ import Header from "./components/Header";
 import TournamentList from "./components/TournamentList";
 import CreateTournament from "./components/CreateTournament";
 import TournamentDetail from "./components/TournamentDetail";
+import useUserRole from "./hooks/useUserRole";
 
 function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("list");
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
+  const { role, isGlobalAdmin, loading } = useUserRole(user);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
@@ -80,15 +82,32 @@ function App() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="app">
+        <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+        <main className="main">
+          <p className="empty">Loading...</p>
+        </main>
+      </div>
+    );
+  }
+
+  // Non-admin trying to access create view: redirect to list
+  if (view === "create" && !isGlobalAdmin) {
+    setView("list");
+  }
+
   return (
     <div className="app">
-      <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+      <Header user={user} role={role} onLogout={handleLogout} onLogoClick={() => setView("list")} />
 
       <main className={`main ${view === "detail" ? "main-full" : ""}`}>
         {view === "list" && (
           <TournamentList
             tournaments={tournaments}
             user={user}
+            isGlobalAdmin={isGlobalAdmin}
             onSelect={(t) => {
               setSelectedTournament(t);
               setView("detail");
@@ -97,7 +116,7 @@ function App() {
             onDelete={handleDeleteTournament}
           />
         )}
-        {view === "create" && (
+        {view === "create" && isGlobalAdmin && (
           <CreateTournament
             user={user}
             onCancel={() => setView("list")}

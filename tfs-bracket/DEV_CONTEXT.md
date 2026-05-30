@@ -153,7 +153,7 @@ src/
     ├── TournamentSidebar.test.jsx # 4 tests
     ├── CreateTournament.test.jsx  # 5 tests
     └── TournamentDetail.test.jsx  # 10 tests (manual participant addition)
-Total: 107 tests across 11 files
+Total: 110 tests across 11 files
 ```
 
 ### Bug Fix: advanceBracket single elim propagation
@@ -204,10 +204,41 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && request.auth.uid == resource.data.adminId;
     }
+    match /users/{userId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
     match /logs/{logId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null;
     }
   }
 }
+```
+
+## Iteration 5: Role-Based Access Control
+
+### Feature: Global Admin/Player Role System
+- **Firestore `users/{uid}` collection**: Each user gets a document with `role`, `email`, `name`, `createdAt` on first login
+- **Bootstrapping**: `VITE_ADMINS` env var lists email addresses that get auto-assigned `admin` role on first login
+- **Role resolution**: `useUserRole` hook reads from Firestore; falls back to env var if Firestore fails
+- **Players**: Cannot create tournaments, cannot see "Create Tournament" button, no access to create view
+- **Admins**: Full access to create and manage tournaments
+- **Admin role badge**: Shows in header next to user name (purple for admin, grey for player)
+
+### Changes:
+- `src/hooks/useUserRole.js`: New hook that reads/creates user role doc in Firestore
+- `src/App.jsx`: Uses `useUserRole`, passes `role` and `isGlobalAdmin` to children; gates create view; shows loading state
+- `src/components/Header.jsx`: Added `role` prop, renders role badge
+- `src/components/TournamentList.jsx`: Only shows "Create Tournament" button and create prompt for `isGlobalAdmin`
+- `src/firebase.js`: Added `setDoc` to imports/exports
+- `src/App.css`: Added `.role-badge` styles
+- `.env`: Added `VITE_ADMINS=frpanico96@gmail.com`
+- `.env.example`: Added `VITE_ADMINS` placeholder
+- `src/test/TournamentList.test.jsx`: Updated tests for `isGlobalAdmin` prop gating
+- `src/test/Header.test.jsx`: Compatible with optional `role` prop
+
+### Test Count
+```
+Total: 110 tests across 11 files
 ```

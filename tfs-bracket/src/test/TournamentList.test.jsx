@@ -21,17 +21,25 @@ const baseTournament = (overrides = {}) => ({
 const mockUser = { uid: "admin-1" };
 
 describe("TournamentList", () => {
-  it("renders empty state when no tournaments", () => {
+  it("renders empty state with create prompt for admin", () => {
     render(
-      <TournamentList tournaments={[]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[]} user={mockUser} isGlobalAdmin={true} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.getByText("No tournaments yet. Create one!")).toBeInTheDocument();
+  });
+
+  it("renders empty state without create prompt for non-admin", () => {
+    render(
+      <TournamentList tournaments={[]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.getByText("No tournaments yet.")).toBeInTheDocument();
+    expect(screen.queryByText("Create one!")).not.toBeInTheDocument();
   });
 
   it("renders tournament cards", () => {
     const t = baseTournament();
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.getByText("Test Tournament")).toBeInTheDocument();
     expect(screen.getByText(/0\/8 players/)).toBeInTheDocument();
@@ -40,7 +48,7 @@ describe("TournamentList", () => {
   it("shows Join Open badge for publishable tournaments with space", () => {
     const t = baseTournament();
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.getByText("Join Open")).toBeInTheDocument();
   });
@@ -48,7 +56,7 @@ describe("TournamentList", () => {
   it("does not show Join Open for past registration", () => {
     const t = baseTournament({ regEnd: pastDate });
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.queryByText("Join Open")).not.toBeInTheDocument();
   });
@@ -56,7 +64,7 @@ describe("TournamentList", () => {
   it("shows delete button for admin", () => {
     const t = baseTournament({ adminId: "admin-1" });
     render(
-      <TournamentList tournaments={[t]} user={{ uid: "admin-1" }} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={{ uid: "admin-1" }} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.getByText("Delete")).toBeInTheDocument();
   });
@@ -64,7 +72,7 @@ describe("TournamentList", () => {
   it("does not show delete button for non-admin", () => {
     const t = baseTournament({ adminId: "admin-1" });
     render(
-      <TournamentList tournaments={[t]} user={{ uid: "other-user" }} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={{ uid: "other-user" }} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
     expect(screen.queryByText("Delete")).not.toBeInTheDocument();
   });
@@ -74,7 +82,7 @@ describe("TournamentList", () => {
     const user = userEvent.setup();
     const t = baseTournament();
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={onSelect} onCreate={() => {}} onDelete={() => {}} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={onSelect} onCreate={() => {}} onDelete={() => {}} />
     );
     await user.click(screen.getByText("Test Tournament"));
     expect(onSelect).toHaveBeenCalledWith(t);
@@ -85,7 +93,7 @@ describe("TournamentList", () => {
     const user = userEvent.setup();
     const t = baseTournament();
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={onDelete} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={onDelete} />
     );
     await user.click(screen.getByText("Delete"));
     expect(screen.getByText(/Are you sure/)).toBeInTheDocument();
@@ -98,18 +106,32 @@ describe("TournamentList", () => {
     const user = userEvent.setup();
     const t = baseTournament();
     render(
-      <TournamentList tournaments={[t]} user={mockUser} onSelect={() => {}} onCreate={() => {}} onDelete={onDelete} />
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={onDelete} />
     );
     await user.click(screen.getByText("Delete"));
     await user.click(screen.getByText("Cancel"));
     expect(onDelete).not.toHaveBeenCalled();
   });
 
+  it("shows create button for global admin", () => {
+    render(
+      <TournamentList tournaments={[baseTournament()]} user={mockUser} isGlobalAdmin={true} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.getByText("+ Create Tournament")).toBeInTheDocument();
+  });
+
+  it("hides create button for non-admin", () => {
+    render(
+      <TournamentList tournaments={[baseTournament()]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.queryByText("+ Create Tournament")).not.toBeInTheDocument();
+  });
+
   it("calls onCreate when create button is clicked", async () => {
     const onCreate = vi.fn();
     const user = userEvent.setup();
     render(
-      <TournamentList tournaments={[baseTournament()]} user={mockUser} onSelect={() => {}} onCreate={onCreate} onDelete={() => {}} />
+      <TournamentList tournaments={[baseTournament()]} user={mockUser} isGlobalAdmin={true} onSelect={() => {}} onCreate={onCreate} onDelete={() => {}} />
     );
     await user.click(screen.getByText("+ Create Tournament"));
     expect(onCreate).toHaveBeenCalledTimes(1);

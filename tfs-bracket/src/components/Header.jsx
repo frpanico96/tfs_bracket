@@ -1,4 +1,4 @@
-export default function Header({ user, onLogout, onLogoClick }) {
+export default function Header({ user, role, onLogout, onLogoClick }) {
   return (
     <header className="header">
       <h1 onClick={onLogoClick} style={{ cursor: "pointer" }}>
@@ -7,6 +7,7 @@ export default function Header({ user, onLogout, onLogoClick }) {
       <div className="user-info">
         <img src={user.photoURL} alt="" className="avatar" />
         <span>{user.displayName}</span>
+        {role && <span className={`role-badge role-${role}`}>{role}</span>}
         <button className="btn-secondary" onClick={onLogout}>
           Logout
         </button>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { parseFirestoreDate } from "../utils/bracket";
 
-export default function TournamentList({ tournaments, user, onSelect, onCreate, onDelete }) {
+export default function TournamentList({ tournaments, user, isGlobalAdmin, onSelect, onCreate, onDelete }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const now = new Date();
 
@@ -21,12 +21,14 @@ export default function TournamentList({ tournaments, user, onSelect, onCreate, 
     <div className="tournament-list">
       <div className="list-header">
         <h2>Tournaments</h2>
-        <button className="btn-primary" onClick={onCreate}>
-          + Create Tournament
-        </button>
+        {isGlobalAdmin && (
+          <button className="btn-primary" onClick={onCreate}>
+            + Create Tournament
+          </button>
+        )}
       </div>
       {tournaments.length === 0 ? (
-        <p className="empty">No tournaments yet. Create one!</p>
+        <p className="empty">{isGlobalAdmin ? "No tournaments yet. Create one!" : "No tournaments yet."}</p>
       ) : (
         <div className="cards">
           {tournaments.map((t) => {

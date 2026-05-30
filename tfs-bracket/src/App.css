@@ -823,6 +823,26 @@ body {
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.role-badge.role-admin {
+  background: #667eea;
+  color: white;
+}
+
+.role-badge.role-player {
+  background: #e0e0e0;
+  color: #666;
+}
+
 .match-score-modal {
   display: flex;
   gap: 0;
