@@ -19,6 +19,7 @@ import Header from "./components/Header";
 import TournamentList from "./components/TournamentList";
 import CreateTournament from "./components/CreateTournament";
 import TournamentDetail from "./components/TournamentDetail";
+import InviteModal from "./components/InviteModal";
 import useUserRole from "./hooks/useUserRole";
 
 function App() {
@@ -26,7 +27,12 @@ function App() {
   const [view, setView] = useState("list");
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
-  const { role, isGlobalAdmin, loading } = useUserRole(user);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("invite") || null;
+  });
+  const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult } = useUserRole(user, inviteToken);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
@@ -107,9 +113,27 @@ function App() {
 
   return (
     <div className="app">
-      <Header user={user} role={role} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+      <Header
+        user={user}
+        role={role}
+        isSuperAdmin={isSuperAdmin}
+        onLogout={handleLogout}
+        onLogoClick={() => setView("list")}
+        onInvite={() => setShowInviteModal(true)}
+      />
 
       <main className={`main ${view === "detail" ? "main-full" : ""}`}>
+        {inviteResult && (
+          <div className={`invite-banner invite-${inviteResult.success ? "success" : "error"}`}>
+            {inviteResult.success
+              ? `Invite accepted! You are now registered as ${inviteResult.role.replace("_", " ")}.`
+              : inviteResult.reason === "invalid"
+              ? "This invite link is invalid or has already been used."
+              : inviteResult.reason === "error"
+              ? "Failed to process invite. Check the console or try again."
+              : "This invite was sent to a different email address."}
+          </div>
+        )}
         {view === "list" && (
           <TournamentList
             tournaments={tournaments}
@@ -143,6 +167,13 @@ function App() {
           />
         )}
       </main>
+
+      {showInviteModal && (
+        <InviteModal
+          user={user}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
     </div>
   );
 }

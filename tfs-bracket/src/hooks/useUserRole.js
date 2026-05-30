@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { doc, getDoc, setDoc, serverTimestamp, db } from "../firebase";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, db } from "../firebase";
+import { getInviteByToken, consumeInvite } from "../utils/invite";
 
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMINS || "")
   .split(",")
@@ -10,9 +11,10 @@ function getFallbackRole(user) {
   return ADMIN_EMAILS.includes(user?.email?.toLowerCase()) ? "admin" : "player";
 }
 
-export default function useUserRole(user) {
-  const [role, setRole] = useState(() => user ? null : null);
-  const [loading, setLoading] = useState(() => !user);
+export default function useUserRole(user, inviteToken) {
+  const [role, setRole] = useState(null);
+  const [loading, setLoading] = useState(!user);
+  const [inviteResult, setInviteResult] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -26,27 +28,73 @@ export default function useUserRole(user) {
 
         if (cancelled) return;
 
+        let resolvedRole;
+
         if (snap.exists()) {
-          setRole(snap.data().role || "player");
+          resolvedRole = snap.data().role || "player";
+          if (inviteToken) {
+            const invite = await getInviteByToken(inviteToken);
+            if (invite && invite.email === user.email) {
+              resolvedRole = invite.role;
+              await updateDoc(ref, { role: resolvedRole });
+              await consumeInvite(invite.id);
+              if (!cancelled) setInviteResult({ success: true, role: resolvedRole });
+            } else if (!invite) {
+              if (!cancelled) setInviteResult({ success: false, reason: "invalid" });
+            } else {
+              if (!cancelled) setInviteResult({ success: false, reason: "email_mismatch" });
+            }
+          }
         } else {
-          const newRole = getFallbackRole(user);
-          await setDoc(ref, {
-            role: newRole,
-            email: user.email,
-            name: user.displayName,
-            createdAt: serverTimestamp(),
-          });
-          if (!cancelled) setRole(newRole);
+          if (inviteToken) {
+            const invite = await getInviteByToken(inviteToken);
+            if (invite && invite.email === user.email) {
+              resolvedRole = invite.role;
+              await setDoc(ref, {
+                role: resolvedRole,
+                email: user.email,
+                name: user.displayName,
+                createdAt: serverTimestamp(),
+              });
+              await consumeInvite(invite.id);
+              if (!cancelled) setInviteResult({ success: true, role: resolvedRole });
+            } else if (!invite) {
+              if (!cancelled) setInviteResult({ success: false, reason: "invalid" });
+            } else {
+              if (!cancelled) setInviteResult({ success: false, reason: "email_mismatch" });
+            }
+          }
+          if (!resolvedRole) {
+            resolvedRole = getFallbackRole(user);
+            await setDoc(ref, {
+              role: resolvedRole,
+              email: user.email,
+              name: user.displayName,
+              createdAt: serverTimestamp(),
+            });
+          }
         }
-      } catch {
-        if (!cancelled) setRole(getFallbackRole(user));
+
+        if (!cancelled) setRole(resolvedRole);
+      } catch (err) {
+        console.warn("useUserRole: invite processing failed", err);
+        if (!cancelled) {
+          if (inviteToken) setInviteResult({ success: false, reason: "error" });
+          setRole(getFallbackRole(user));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, inviteToken]);
 
-  return { role, isGlobalAdmin: role === "admin", loading };
+  return {
+    role,
+    isGlobalAdmin: role === "admin" || role === "tournament_admin",
+    isSuperAdmin: role === "admin",
+    loading,
+    inviteResult,
+  };
 }
