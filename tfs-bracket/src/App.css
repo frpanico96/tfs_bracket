@@ -432,6 +432,26 @@ body {
   margin-top: 8px;
 }
 
+.badge-completed {
+  display: inline-block;
+  background: var(--border-light);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.card-completed {
+  opacity: 0.7;
+  border-color: var(--border);
+}
+
+.card-completed:hover {
+  opacity: 0.85;
+}
+
 .empty {
   text-align: center;
   color: var(--text-muted);

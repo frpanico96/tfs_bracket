@@ -136,4 +136,81 @@ describe("TournamentList", () => {
     await user.click(screen.getByText("+ Create Tournament"));
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
+
+  it("shows Completed badge when all matches have winners", () => {
+    const t = baseTournament({
+      started: true,
+      matches: [
+        { id: "m1", player1: "A", player2: "B", winner: 0, isPlayed: true },
+        { id: "m2", player1: "C", player2: "D", winner: 1, isPlayed: true },
+      ],
+    });
+    render(
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.queryByText("Join Open")).not.toBeInTheDocument();
+  });
+
+  it("shows Published status for unstarted tournament", () => {
+    const t = baseTournament();
+    render(
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.getByText(/Published/)).toBeInTheDocument();
+    expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  });
+
+  it("does not show Completed badge when matches have no winners", () => {
+    const t = baseTournament({
+      started: true,
+      matches: [
+        { id: "m1", player1: "A", player2: "B", winner: null, isPlayed: false },
+      ],
+    });
+    render(
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  });
+
+  it("sorts completed tournaments after active ones", () => {
+    const { container } = render(
+      <TournamentList
+        tournaments={[
+          baseTournament({
+            id: "t-active",
+            name: "Active Tournament",
+            started: true,
+            matches: [{ id: "m1", player1: "A", player2: "B", winner: null, isPlayed: false }],
+          }),
+          baseTournament({
+            id: "t-done",
+            name: "Done Tournament",
+            started: true,
+            matches: [{ id: "m2", player1: "C", player2: "D", winner: 0, isPlayed: true }],
+          }),
+        ]}
+        user={mockUser}
+        isGlobalAdmin={false}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDelete={() => {}}
+      />
+    );
+    const cards = container.querySelectorAll(".card h3");
+    expect(cards[0].textContent).toBe("Active Tournament");
+    expect(cards[1].textContent).toBe("Done Tournament");
+  });
+
+  it("applies card-completed class to completed tournaments", () => {
+    const t = baseTournament({
+      started: true,
+      matches: [{ id: "m1", player1: "A", player2: "B", winner: 0, isPlayed: true }],
+    });
+    const { container } = render(
+      <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
+    );
+    expect(container.querySelector(".card-completed")).toBeInTheDocument();
+  });
 });
