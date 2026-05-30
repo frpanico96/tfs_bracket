@@ -8,7 +8,6 @@ import {
   tournamentsRef,
   query,
   where,
-  orderBy,
   onSnapshot,
   doc,
   deleteDoc,
@@ -43,8 +42,8 @@ function App() {
     if (loading) return;
 
     const constraints = isGlobalAdmin
-      ? [orderBy("createdAt", "desc")]
-      : [where("published", "==", true), orderBy("createdAt", "desc")];
+      ? []
+      : [where("published", "==", true)];
 
     const q = query(tournamentsRef, ...constraints);
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -52,6 +51,11 @@ function App() {
         id: doc.id,
         ...doc.data(),
       }));
+      data.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() ?? 0;
+        const bTime = b.createdAt?.toMillis?.() ?? 0;
+        return bTime - aTime;
+      });
       setTournaments(data);
     });
     return () => unsubscribe();
