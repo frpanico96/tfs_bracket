@@ -7,6 +7,7 @@ import {
   parseFirestoreDate,
   resetBracket,
   isDoubleBracket,
+  swapPlayers,
 } from "../utils/bracket";
 
 function makeParticipants(n) {
@@ -260,5 +261,63 @@ describe("isDoubleBracket", () => {
   it("returns falsy for null/undefined", () => {
     expect(isDoubleBracket(null)).toBeFalsy();
     expect(isDoubleBracket(undefined)).toBeFalsy();
+  });
+});
+
+describe("swapPlayers", () => {
+  const matches = [
+    { id: "r1-m0", player1: "A", player2: "B", isPlayed: false },
+    { id: "r1-m1", player1: "C", player2: "D", isPlayed: false },
+  ];
+
+  it("swaps player1 of first match with player1 of second match", () => {
+    const result = swapPlayers(matches, "r1-m0", 0, "r1-m1", 0);
+    expect(result[0].player1).toBe("C");
+    expect(result[1].player1).toBe("A");
+    expect(result[0].player2).toBe("B");
+    expect(result[1].player2).toBe("D");
+  });
+
+  it("swaps player1 with player2 across matches", () => {
+    const result = swapPlayers(matches, "r1-m0", 0, "r1-m1", 1);
+    expect(result[0].player1).toBe("D");
+    expect(result[1].player2).toBe("A");
+  });
+
+  it("does not mutate original matches array", () => {
+    const original = matches[0].player1;
+    swapPlayers(matches, "r1-m0", 0, "r1-m1", 0);
+    expect(matches[0].player1).toBe(original);
+    expect(matches[0].player1).toBe("A");
+    expect(matches[1].player1).toBe("C");
+  });
+
+  it("rejects swap involving TBD player", () => {
+    const withTbd = [
+      { id: "r1-m0", player1: "A", player2: "TBD", isPlayed: false },
+      { id: "r1-m1", player1: "C", player2: "D", isPlayed: false },
+    ];
+    const result = swapPlayers(withTbd, "r1-m0", 1, "r1-m1", 0);
+    expect(result).toBe(withTbd);
+  });
+
+  it("rejects swap involving BYE player", () => {
+    const withBye = [
+      { id: "r1-m0", player1: "A", player2: "BYE", isPlayed: false },
+      { id: "r1-m1", player1: "C", player2: "D", isPlayed: false },
+    ];
+    const result = swapPlayers(withBye, "r1-m0", 1, "r1-m1", 0);
+    expect(result).toBe(withBye);
+  });
+
+  it("rejects swap when either match is not found", () => {
+    const result = swapPlayers(matches, "r1-m0", 0, "nonexistent", 0);
+    expect(result).toBe(matches);
+  });
+
+  it("swaps within the same match (player1 and player2)", () => {
+    const result = swapPlayers(matches, "r1-m0", 0, "r1-m0", 1);
+    expect(result[0].player1).toBe("B");
+    expect(result[0].player2).toBe("A");
   });
 });

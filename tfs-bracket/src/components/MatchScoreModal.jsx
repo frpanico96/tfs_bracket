@@ -1,6 +1,7 @@
 import { useState } from "react";
 import BaseModal from "./BaseModal";
 import PlayerColumn from "./PlayerColumn";
+import { getMatchRoundName } from "../utils/bracket";
 
 function getWinConditionTarget(condition) {
   if (!condition) return 3;
@@ -12,9 +13,10 @@ function getScoreButtons(condition) {
   return Array.from({ length: target + 1 }, (_, i) => i);
 }
 
-export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
+export default function MatchScoreModal({ isOpen, onClose, match, onSave, bracketType, allMatches }) {
   const [p1Score, setP1Score] = useState(0);
   const [p2Score, setP2Score] = useState(0);
+  const [dq, setDq] = useState(null);
 
   if (!match) return null;
 
@@ -24,17 +26,26 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
   const handleClose = () => {
     setP1Score(0);
     setP2Score(0);
+    setDq(null);
     onClose();
   };
 
-  const isScoreValid = p1Score !== p2Score && Math.max(p1Score, p2Score) === target && Math.max(p1Score, p2Score) > 0;
+  const isDqActive = dq === 0 || dq === 1;
+  const isScoreValid = isDqActive || (p1Score !== p2Score && Math.max(p1Score, p2Score) === target && Math.max(p1Score, p2Score) > 0);
 
   const handleSave = () => {
     if (!isScoreValid) return;
-    const winnerIndex = p1Score > p2Score ? 0 : 1;
-    onSave(match, { p1Score, p2Score, winnerIndex });
+    if (isDqActive) {
+      const winnerIndex = dq === 0 ? 1 : 0;
+      onSave(match, { p1Score: null, p2Score: null, winnerIndex, dq });
+    } else {
+      const winnerIndex = p1Score > p2Score ? 0 : 1;
+      onSave(match, { p1Score, p2Score, winnerIndex, dq: null });
+    }
     handleClose();
   };
+
+  const roundName = getMatchRoundName(match, allMatches, bracketType);
 
   return (
     <BaseModal isOpen={isOpen} onClose={handleClose} title="Record Score">
@@ -46,20 +57,34 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
               score={p1Score}
               scoreButtons={buttons}
               onSelectScore={setP1Score}
+              onDQ={() => setDq(dq === 0 ? null : 0)}
+              isDQ={dq === 0}
+              isDQOpponent={dq === 1}
             />
             <div className="match-score-display">
-              <div className={`match-score-value ${isScoreValid ? "score-valid" : ""}`}>
-                {p1Score} - {p2Score}
-              </div>
-              <div className="match-score-label">
-                {match.winCondition?.toUpperCase() || "FT3"}
-              </div>
+              {isDqActive ? (
+                <div className="match-score-dq">
+                  {dq === 0 ? match.player1 : match.player2} DQ'd
+                </div>
+              ) : (
+                <>
+                  <div className={`match-score-value ${isScoreValid ? "score-valid" : ""}`}>
+                    {p1Score} - {p2Score}
+                  </div>
+                  <div className="match-score-label">
+                    {match.winCondition?.toUpperCase() || "FT3"}
+                  </div>
+                </>
+              )}
             </div>
             <PlayerColumn
               name={match.player2}
               score={p2Score}
               scoreButtons={buttons}
               onSelectScore={setP2Score}
+              onDQ={() => setDq(dq === 1 ? null : 1)}
+              isDQ={dq === 1}
+              isDQOpponent={dq === 0}
             />
           </div>
           <div className="match-score-actions">
@@ -70,9 +95,14 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
               Save
             </button>
           </div>
-          {!isScoreValid && (
+          {!isScoreValid && !isDqActive && (
             <p className="score-validation-hint">
               Winner must reach {match.winCondition?.toUpperCase() || "FT3"}
+            </p>
+          )}
+          {isDqActive && (
+            <p className="dq-validation-hint">
+              {dq === 0 ? match.player1 : match.player2} will be disqualified
             </p>
           )}
         </div>
@@ -80,9 +110,17 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave }) {
           <div className="match-score-sidebar-section">
             <h4>Match Info</h4>
             <p className="match-info-label">Round</p>
-            <p className="match-info-value">Round {match.round}</p>
+            <p className="match-info-value">{roundName}</p>
             <p className="match-info-label">Match</p>
             <p className="match-info-value">#{match.matchIndex + 1}</p>
+            {bracketType === 'double' && match.bracket && match.bracket !== 'grandFinal' && (
+              <>
+                <p className="match-info-label">Bracket</p>
+                <p className="match-info-value">
+                  {match.bracket === 'winners' ? 'Winners' : 'Losers'}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

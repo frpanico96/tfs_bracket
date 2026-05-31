@@ -21,6 +21,7 @@ vi.mock("../utils/bracket", () => ({
   generateDoubleEliminationBracket: vi.fn(() => []),
   advanceBracket: vi.fn(() => []),
   parseFirestoreDate: vi.fn((v) => v instanceof Date ? v : new Date(v)),
+  computeRankings: vi.fn(() => []),
 }));
 
 let mockOnSave = null;

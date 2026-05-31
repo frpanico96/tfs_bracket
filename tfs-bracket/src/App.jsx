@@ -18,7 +18,10 @@ import Header from "./components/Header";
 import TournamentList from "./components/TournamentList";
 import CreateTournament from "./components/CreateTournament";
 import TournamentDetail from "./components/TournamentDetail";
+import Leaderboard from "./components/Leaderboard";
 import InviteModal from "./components/InviteModal";
+import ReleaseNotes from "./components/ReleaseNotes";
+import VersionBadges from "./components/VersionBadges";
 import useUserRole from "./hooks/useUserRole";
 
 function App() {
@@ -31,6 +34,8 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get("invite") || null;
   });
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
   const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized } = useUserRole(user, inviteToken);
 
   useEffect(() => {
@@ -39,7 +44,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || view === "leaderboard") return;
 
     const constraints = isGlobalAdmin
       ? []
@@ -59,7 +64,13 @@ function App() {
       setTournaments(data);
     });
     return () => unsubscribe();
-  }, [loading, isGlobalAdmin]);
+  }, [loading, isGlobalAdmin, view]);
+
+  useEffect(() => {
+    if (view === "create" && !isGlobalAdmin) {
+      setView("list");
+    }
+  }, [view, isGlobalAdmin]);
 
   const handleLogin = async () => {
     try {
@@ -86,24 +97,30 @@ function App() {
   };
 
   if (!user) {
-    const version = import.meta.env.VITE_APP_VERSION || "beta-v0.1";
     return (
-      <div className="login-container">
-        <div className="login-box">
-          <h1>TFS Bracket <span className="version-badge">{version}</span></h1>
-          <p>Create and manage tournament brackets</p>
-          <button className="btn-primary" onClick={handleLogin}>
-            Sign in with Google
-          </button>
+      <>
+        <div className="login-container">
+          <div className="login-box">
+            <h1>TFS Bracket <VersionBadges onVersionClick={() => setShowReleaseNotes(true)} /></h1>
+            <p>Create and manage tournament brackets</p>
+            <button className="btn-primary" onClick={handleLogin}>
+              Sign in with Google
+            </button>
+          </div>
         </div>
-      </div>
+        <ReleaseNotes
+          isOpen={showReleaseNotes}
+          onClose={() => setShowReleaseNotes(false)}
+          currentVersion={version}
+        />
+      </>
     );
   }
 
   if (loading) {
     return (
       <div className="app">
-        <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+         <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
         <main className="main">
           <p className="empty">Loading...</p>
         </main>
@@ -114,7 +131,7 @@ function App() {
   if (isAuthorized === false) {
     return (
       <div className="app">
-        <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} />
+         <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
         <main className="main">
           <div className="access-denied">
             <h2>Access Restricted</h2>
@@ -126,11 +143,6 @@ function App() {
     );
   }
 
-  // Non-admin trying to access create view: redirect to list
-  if (view === "create" && !isGlobalAdmin) {
-    setView("list");
-  }
-
   return (
     <div className="app">
       <Header
@@ -140,6 +152,8 @@ function App() {
         onLogout={handleLogout}
         onLogoClick={() => setView("list")}
         onInvite={() => setShowInviteModal(true)}
+        onNavigate={setView}
+        onVersionClick={() => setShowReleaseNotes(true)}
       />
 
       <main className={`main ${view === "detail" ? "main-full" : ""}`}>
@@ -154,38 +168,43 @@ function App() {
               : "This invite was sent to a different email address."}
           </div>
         )}
-        {view === "list" && (
-          <TournamentList
-            tournaments={tournaments}
-            user={user}
-            isGlobalAdmin={isGlobalAdmin}
-            onSelect={(t) => {
-              setSelectedTournament(t);
-              setView("detail");
-            }}
-            onCreate={() => setView("create")}
-            onDelete={handleDeleteTournament}
-          />
-        )}
-        {view === "create" && isGlobalAdmin && (
-          <CreateTournament
-            user={user}
-            onCancel={() => setView("list")}
-            onCreated={(t) => {
-              setSelectedTournament(t);
-              setView("detail");
-            }}
-          />
-        )}
-        {view === "detail" && selectedTournament && (
-          <TournamentDetail
-            tournament={selectedTournament}
-            user={user}
-            onBack={() => setView("list")}
-            onUpdate={(t) => setSelectedTournament(t)}
-            onDelete={handleDeleteTournament}
-          />
-        )}
+        <div className="view-container">
+          {view === "list" && (
+            <TournamentList
+              tournaments={tournaments}
+              user={user}
+              isGlobalAdmin={isGlobalAdmin}
+              onSelect={(t) => {
+                setSelectedTournament(t);
+                setView("detail");
+              }}
+              onCreate={() => setView("create")}
+              onDelete={handleDeleteTournament}
+            />
+          )}
+          {view === "create" && isGlobalAdmin && (
+            <CreateTournament
+              user={user}
+              onCancel={() => setView("list")}
+              onCreated={(t) => {
+                setSelectedTournament(t);
+                setView("detail");
+              }}
+            />
+          )}
+          {view === "detail" && selectedTournament && (
+            <TournamentDetail
+              tournament={selectedTournament}
+              user={user}
+              onBack={() => setView("list")}
+              onUpdate={(t) => setSelectedTournament(t)}
+              onDelete={handleDeleteTournament}
+            />
+          )}
+          {view === "leaderboard" && (
+            <Leaderboard />
+          )}
+        </div>
       </main>
 
       {showInviteModal && (
@@ -194,6 +213,11 @@ function App() {
           onClose={() => setShowInviteModal(false)}
         />
       )}
+      <ReleaseNotes
+        isOpen={showReleaseNotes}
+        onClose={() => setShowReleaseNotes(false)}
+        currentVersion={version}
+      />
     </div>
   );
 }

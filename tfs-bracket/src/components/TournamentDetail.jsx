@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { db, doc, updateDoc } from "../firebase";
-import { generateBracket, generateDoubleEliminationBracket, advanceBracket, parseFirestoreDate } from "../utils/bracket";
+import { db, doc, updateDoc, getDoc, increment } from "../firebase";
+import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
@@ -35,6 +35,20 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addParticipantName, setAddParticipantName] = useState("");
   const [addParticipantEmail, setAddParticipantEmail] = useState("");
+  const [swapMode, setSwapMode] = useState(false);
+  const [swapQuickMode, setSwapQuickMode] = useState(false);
+  const [editParticipant, setEditParticipant] = useState(null);
+  const [editParticipantName, setEditParticipantName] = useState("");
+  const [editParticipantEmail, setEditParticipantEmail] = useState("");
+  const [showRankScores, setShowRankScores] = useState(false);
+  const [rankScoreValues, setRankScoreValues] = useState([]);
+
+  const rankings = t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [];
+
+  const isComplete = () => {
+    if (!t.started || !t.matches || t.matches.length === 0) return false;
+    return t.matches.every((m) => m.winner != null);
+  };
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -79,17 +93,50 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     setSelectedMatch(match);
   };
 
-  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex }) => {
+  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex, dq }) => {
     if (!isAdmin) return;
-    if (typeof p1Score !== "number" || typeof p2Score !== "number" || !Number.isFinite(p1Score) || !Number.isFinite(p2Score) || p1Score < 0 || p2Score < 0) return;
-    if (winnerIndex !== 0 && winnerIndex !== 1) return;
     const matchIndex = t.matches.findIndex((m) => m.id === match.id);
-    const winner = winnerIndex === 0 ? match.player1 : match.player2;
-    const matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
+
+    let matches;
+    if (dq != null) {
+      matches = advanceBracket(t.matches, matchIndex, dq === 0 ? 1 : 0, null);
+      matches[matchIndex].dq = dq;
+      matches[matchIndex].scoreP1 = null;
+      matches[matchIndex].scoreP2 = null;
+      const dqd = dq === 0 ? match.player1 : match.player2;
+      logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner: dqd === match.player1 ? match.player2 : match.player1, round: match.round, dq: dqd } });
+    } else {
+      if (typeof p1Score !== "number" || typeof p2Score !== "number" || !Number.isFinite(p1Score) || !Number.isFinite(p2Score) || p1Score < 0 || p2Score < 0) return;
+      if (winnerIndex !== 0 && winnerIndex !== 1) return;
+      const winner = winnerIndex === 0 ? match.player1 : match.player2;
+      matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
+      logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner, round: match.round, score: `${p1Score}-${p2Score}` } });
+    }
+
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches });
     onUpdate({ ...t, matches });
-    logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner, round: match.round, score: `${p1Score}-${p2Score}` } });
+
+    const updatedTournament = { ...t, matches };
+    const allDone = !t.scoresAssigned && updatedTournament.matches.every((m) => m.winner != null);
+    if (allDone) {
+      const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants);
+      for (const entry of finalRanks) {
+        for (const player of entry.players) {
+          if (!player.id || player.id.startsWith("manual-") || player.id.startsWith("fake-")) continue;
+          try {
+            const userRef = doc(db, "users", player.id);
+            const snap = await getDoc(userRef);
+            if (snap.exists()) {
+              await updateDoc(userRef, { score: increment(entry.points) });
+            }
+          } catch {
+          }
+        }
+      }
+      await updateDoc(ref, { scoresAssigned: true });
+      onUpdate({ ...updatedTournament, scoresAssigned: true });
+    }
   };
 
   const handleUpdateAllWinConditions = async (condition) => {
@@ -180,6 +227,83 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
   };
 
+  const anyMatchPlayed = t.matches?.length > 0 && t.matches.some((m) => m.isPlayed);
+  const canSwapPlayers = isAdmin && t.matches?.length > 0 && !anyMatchPlayed && (swapQuickMode || swapMode);
+
+  const handleSwapPlayers = async (matchId1, slot1, matchId2, slot2) => {
+    if (!isAdmin) return;
+    const matches = swapPlayers(t.matches, matchId1, slot1, matchId2, slot2);
+    if (matches === t.matches) return;
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches });
+    onUpdate({ ...t, matches });
+    logEvent({ action: "swap_players", details: { tournamentId: t.id, matchId1, slot1, matchId2, slot2 } });
+    setSwapMode(false);
+  };
+
+  const handleEnterSwapMode = () => {
+    if (!isAdmin) return;
+    if (t.matches.some((m) => m.isPlayed)) return;
+    setSwapMode(true);
+  };
+
+  const handleExitSwapMode = () => {
+    setSwapMode(false);
+  };
+
+  const handleEditParticipant = (participant) => {
+    setEditParticipant(participant);
+    setEditParticipantName(participant.name);
+    setEditParticipantEmail(participant.email || "");
+  };
+
+  const handleSaveEditParticipant = async (e) => {
+    e.preventDefault();
+    if (!isAdmin || !editParticipant) return;
+    const name = editParticipantName.trim();
+    if (!name) return;
+    const updatedParticipants = t.participants.map((p) =>
+      p.id === editParticipant.id ? { ...p, name, email: editParticipantEmail.trim() || p.email } : p
+    );
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { participants: updatedParticipants });
+    onUpdate({ ...t, participants: updatedParticipants });
+    logEvent({ action: "edit_participant", details: { tournamentId: t.id, participantId: editParticipant.id, previousName: editParticipant.name, newName: name } });
+    setEditParticipant(null);
+    setEditParticipantName("");
+    setEditParticipantEmail("");
+  };
+
+  const handleRemoveParticipant = async (participant) => {
+    if (!isAdmin) return;
+    if (!confirm(`Remove "${participant.name}" from the tournament?`)) return;
+    const updatedParticipants = t.participants.filter((p) => p.id !== participant.id);
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { participants: updatedParticipants });
+    onUpdate({ ...t, participants: updatedParticipants });
+    logEvent({ action: "remove_participant", details: { tournamentId: t.id, participantId: participant.id, participantName: participant.name } });
+  };
+
+  const handleOpenRankScores = () => {
+    const existing = t.rankScores || [];
+    const scores = Array.from({ length: t.maxParticipants }, (_, i) => (existing[i] != null ? existing[i] : 0));
+    setRankScoreValues(scores);
+    setShowRankScores(true);
+  };
+
+  const handleSaveRankScores = async () => {
+    if (!isAdmin) return;
+    const scores = rankScoreValues.map((v) => {
+      const n = parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    });
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { rankScores: scores });
+    onUpdate({ ...t, rankScores: scores });
+    logEvent({ action: "set_rank_scores", details: { tournamentId: t.id, scores } });
+    setShowRankScores(false);
+  };
+
   const handleDelete = async () => {
     if (!isAdmin) return;
     logEvent({ action: "delete_tournament", details: { tournamentId: t.id, adminId: user.uid } });
@@ -240,8 +364,16 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             ) : (
               <ul className="participants-list">
                 {t.participants.map((p, i) => (
-                  <li key={i}>
-                    {i + 1}. {p.name}
+                  <li key={p.id} className="participant-item">
+                    <span className="participant-name">
+                      <span className="participant-num">{i + 1}.</span> {p.name}
+                    </span>
+                    {isAdmin && (
+                      <span className="participant-actions">
+                        <button className="btn-icon" onClick={() => handleEditParticipant(p)} title="Edit">✎</button>
+                        <button className="btn-icon btn-icon-danger" onClick={() => handleRemoveParticipant(p)} title="Remove">✕</button>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -275,6 +407,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                   Change Max Players
                 </button>
               )}
+              {isAdmin && (
+                <button className="btn-secondary" onClick={handleOpenRankScores}>
+                  Set Scores
+                </button>
+              )}
               {isAdmin && t.published && (
                 <button className="btn-primary" onClick={handleStartTournament} disabled={t.participants.length < 2}>
                   Start Tournament ({t.participants.length}/{t.maxParticipants})
@@ -291,6 +428,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               <button className="btn-secondary" onClick={onBack}>
                 ← Back
               </button>
+              {isAdmin && !swapMode && !anyMatchPlayed && !swapQuickMode && (
+                <button className="btn-secondary" onClick={handleEnterSwapMode}>
+                  ⇄ Swap Players
+                </button>
+              )}
               {isAdmin && (
                 <button className="btn-secondary" onClick={handleResetBracket}>
                   Reset Bracket
@@ -302,12 +444,22 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 </button>
               )}
             </div>
+            {swapMode && (
+              <div className="swap-banner">
+                <span>Click two players to swap them</span>
+                <button className="btn-secondary btn-swap-cancel" onClick={handleExitSwapMode}>
+                  Cancel
+                </button>
+              </div>
+            )}
             <BracketView
               matches={t.matches}
               onMatchClick={handleMatchClick}
               isAdmin={isAdmin}
               bracketType={t.bracketType}
               onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
+              canSwap={canSwapPlayers}
+              onSwapPlayers={handleSwapPlayers}
             />
           </>
         )}
@@ -335,20 +487,25 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         </div>
       )}
 
-      {isAdmin && (
-        <TournamentSidebar
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          currentCondition={getDefaultWinCondition()}
-          onUpdateCondition={handleUpdateAllWinConditions}
-        />
-      )}
+      <TournamentSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        currentCondition={getDefaultWinCondition()}
+        onUpdateCondition={handleUpdateAllWinConditions}
+        isDev={isDev}
+        swapQuickMode={swapQuickMode}
+        onSwapQuickModeToggle={setSwapQuickMode}
+        isAdmin={isAdmin}
+        rankings={rankings}
+      />
 
       <MatchScoreModal
         isOpen={!!selectedMatch}
         onClose={() => setSelectedMatch(null)}
         match={selectedMatch}
         onSave={handleSaveScore}
+        bracketType={t.bracketType}
+        allMatches={t.matches}
       />
 
       <BaseModal
@@ -412,6 +569,77 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             </button>
           </div>
         </form>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={!!editParticipant}
+        onClose={() => { setEditParticipant(null); setEditParticipantName(""); setEditParticipantEmail(""); }}
+        title="Edit Participant"
+      >
+        <form onSubmit={handleSaveEditParticipant}>
+          <label className="modal-field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={editParticipantName}
+              onChange={(e) => setEditParticipantName(e.target.value)}
+              placeholder="Player name"
+              autoFocus
+              required
+            />
+          </label>
+          <label className="modal-field">
+            <span>Email</span>
+            <input
+              type="email"
+              value={editParticipantEmail}
+              onChange={(e) => setEditParticipantEmail(e.target.value)}
+              placeholder="player@example.com"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={() => { setEditParticipant(null); setEditParticipantName(""); setEditParticipantEmail(""); }}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={!editParticipantName.trim()}>
+              Save
+            </button>
+          </div>
+        </form>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={showRankScores}
+        onClose={() => setShowRankScores(false)}
+        title="Score Settings"
+      >
+        <p className="modal-desc">Set points awarded for each finishing position.</p>
+        <div className="rank-scores-list">
+          {rankScoreValues.map((val, i) => (
+            <label key={i} className="rank-score-field">
+              <span className="rank-score-label">{i + 1}{i === 0 ? "st" : i === 1 ? "nd" : i === 2 ? "rd" : "th"} Place</span>
+              <input
+                type="number"
+                min="0"
+                value={val}
+                onChange={(e) => {
+                  const next = [...rankScoreValues];
+                  next[i] = e.target.value;
+                  setRankScoreValues(next);
+                }}
+                className="rank-score-input"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn-secondary" onClick={() => setShowRankScores(false)}>
+            Cancel
+          </button>
+          <button type="button" className="btn-primary" onClick={handleSaveRankScores}>
+            Save Scores
+          </button>
+        </div>
       </BaseModal>
     </div>
   );

@@ -1,11 +1,18 @@
-export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick, onInvite }) {
-  const version = import.meta.env.VITE_APP_VERSION || "beta-v0.1";
+import VersionBadges from "./VersionBadges";
+
+export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
   return (
     <header className="header">
-      <h1 onClick={onLogoClick} style={{ cursor: "pointer" }}>
-        TFS Bracket
-        <span className="version-badge">{version}</span>
-      </h1>
+      <div className="header-left">
+        <h1 onClick={onLogoClick} style={{ cursor: "pointer" }}>
+          TFS Bracket
+          <VersionBadges onVersionClick={onVersionClick} />
+        </h1>
+        <nav className="header-nav">
+          <button className="nav-link" onClick={() => onNavigate("list")}>Tournaments</button>
+          <button className="nav-link" onClick={() => onNavigate("leaderboard")}>Leaderboard</button>
+        </nav>
+      </div>
       <div className="user-info">
         <img src={user.photoURL} alt="" className="avatar" />
         <span>{user.displayName}</span>

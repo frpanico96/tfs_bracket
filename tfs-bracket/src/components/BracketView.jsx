@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { groupByRound } from "../utils/bracket";
 
 function getRoundName(roundMatches, isLastRound, isFirstRound, hasPrelims) {
@@ -25,7 +26,7 @@ function getLbRoundName(roundMatches, roundIndex, totalRounds) {
   return `Losers Round ${roundMatches[0]?.round ?? 0}`;
 }
 
-function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick }) {
+function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick, canSwap, swapSelected, onPlayerClick }) {
   if (match.player1 === "BYE" && match.player2 === "BYE") return null;
   const isPlayed = match.isPlayed === true || match.winner != null;
   const p1Filled = match.player1 && match.player1 !== "TBD";
@@ -35,6 +36,9 @@ function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick }) {
   const isClickable = isAdmin && !isPlayed && p1Filled && p2Filled && !hasBye;
 
   const showWinCond = !hasBye && p1Filled && p2Filled;
+
+  const isSelected1 = swapSelected?.matchId === match.id && swapSelected?.slot === 0;
+  const isSelected2 = swapSelected?.matchId === match.id && swapSelected?.slot === 1;
 
   return (
     <div
@@ -52,22 +56,28 @@ function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick }) {
         </div>
       )}
       <div className="match-row">
-        <span className={match.winner === 0 ? "winner" : ""}>
+        <span
+          className={`${match.winner === 0 ? "winner" : ""} ${canSwap ? "swap-player" : ""} ${isSelected1 ? "swap-selected" : ""}`}
+          onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 0); }}
+        >
           {match.player1 || "TBD"}
         </span>
-        {isPlayed && !hasBye && (
-          <span className={`score-badge ${match.winner === 0 ? "score-winner" : "score-loser"}`}>
-            {match.scoreP1}
+        {isPlayed && !hasBye && match.dq !== 1 && (
+          <span className={`score-badge ${match.winner === 0 ? "score-winner" : "score-loser"} ${match.dq === 0 ? "dq-badge" : ""}`}>
+            {match.dq === 0 ? "DQ" : match.scoreP1}
           </span>
         )}
       </div>
       <div className="match-row">
-        <span className={match.winner === 1 ? "winner" : ""}>
+        <span
+          className={`${match.winner === 1 ? "winner" : ""} ${canSwap ? "swap-player" : ""} ${isSelected2 ? "swap-selected" : ""}`}
+          onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 1); }}
+        >
           {match.player2 || "TBD"}
         </span>
-        {isPlayed && !hasBye && (
-          <span className={`score-badge ${match.winner === 1 ? "score-winner" : "score-loser"}`}>
-            {match.scoreP2}
+        {isPlayed && !hasBye && match.dq !== 0 && (
+          <span className={`score-badge ${match.winner === 1 ? "score-winner" : "score-loser"} ${match.dq === 1 ? "dq-badge" : ""}`}>
+            {match.dq === 1 ? "DQ" : match.scoreP2}
           </span>
         )}
       </div>
@@ -75,11 +85,13 @@ function MatchCard({ match, onMatchClick, isAdmin, onMatchWinConditionClick }) {
   );
 }
 
-function GrandFinalMatch({ match, onMatchClick, isAdmin, label, onMatchWinConditionClick }) {
+function GrandFinalMatch({ match, onMatchClick, isAdmin, label, onMatchWinConditionClick, canSwap, swapSelected, onPlayerClick }) {
   const isPlayed = match.isPlayed === true || match.winner != null;
   const p1Filled = match.player1 && match.player1 !== "TBD";
   const p2Filled = match.player2 && match.player2 !== "TBD";
   const isClickable = isAdmin && !isPlayed && p1Filled && p2Filled;
+  const isSelected1 = swapSelected?.matchId === match.id && swapSelected?.slot === 0;
+  const isSelected2 = swapSelected?.matchId === match.id && swapSelected?.slot === 1;
 
   if (!p1Filled && !p2Filled && !isPlayed) {
     return (
@@ -111,22 +123,26 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, label, onMatchWinCondit
             </span>
           </div>
           <div className="match-row">
-            <span className={`${match.winner === 0 ? "winner" : ""} gf-winner-label`}>
+            <span className={`${match.winner === 0 ? "winner" : ""} gf-winner-label ${canSwap ? "swap-player" : ""} ${isSelected1 ? "swap-selected" : ""}`}
+              onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 0); }}
+            >
               {match.player1 || "TBD"}
             </span>
-            {isPlayed && (
-              <span className={`score-badge ${match.winner === 0 ? "score-winner" : "score-loser"}`}>
-                {match.scoreP1}
+            {isPlayed && match.dq !== 1 && (
+              <span className={`score-badge ${match.winner === 0 ? "score-winner" : "score-loser"} ${match.dq === 0 ? "dq-badge" : ""}`}>
+                {match.dq === 0 ? "DQ" : match.scoreP1}
               </span>
             )}
           </div>
           <div className="match-row">
-            <span className={`${match.winner === 1 ? "winner" : ""} gf-loser-label`}>
+            <span className={`${match.winner === 1 ? "winner" : ""} gf-loser-label ${canSwap ? "swap-player" : ""} ${isSelected2 ? "swap-selected" : ""}`}
+              onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 1); }}
+            >
               {match.player2 || "TBD"}
             </span>
-            {isPlayed && (
-              <span className={`score-badge ${match.winner === 1 ? "score-winner" : "score-loser"}`}>
-                {match.scoreP2}
+            {isPlayed && match.dq !== 0 && (
+              <span className={`score-badge ${match.winner === 1 ? "score-winner" : "score-loser"} ${match.dq === 1 ? "dq-badge" : ""}`}>
+                {match.dq === 1 ? "DQ" : match.scoreP2}
               </span>
             )}
           </div>
@@ -136,21 +152,64 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, label, onMatchWinCondit
   );
 }
 
-export default function BracketView({ matches, onMatchClick, isAdmin, bracketType, onMatchWinConditionClick }) {
+export default function BracketView({ matches, onMatchClick, isAdmin, bracketType, onMatchWinConditionClick, canSwap, onSwapPlayers }) {
   const isDouble = bracketType === "double";
+  const [swapSelected, setSwapSelected] = useState(null);
+
+  const handlePlayerClick = (matchId, slot) => {
+    if (!swapSelected) {
+      const match = matches.find(m => m.id === matchId);
+      const player = slot === 0 ? match?.player1 : match?.player2;
+      if (!player || player === "TBD" || player === "BYE") return;
+      setSwapSelected({ matchId, slot });
+    } else {
+      if (swapSelected.matchId === matchId && swapSelected.slot === slot) {
+        setSwapSelected(null);
+        return;
+      }
+      const match2 = matches.find(m => m.id === matchId);
+      const player2 = slot === 0 ? match2?.player1 : match2?.player2;
+      if (!player2 || player2 === "TBD" || player2 === "BYE") {
+        setSwapSelected(null);
+        return;
+      }
+      onSwapPlayers(swapSelected.matchId, swapSelected.slot, matchId, slot);
+      setSwapSelected(null);
+    }
+  };
 
   if (!matches || matches.length === 0) {
     return <p className="empty">No matches yet</p>;
   }
 
   if (!isDouble) {
-    return <SingleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />;
+    return (
+      <SingleBracketView
+        matches={matches}
+        onMatchClick={onMatchClick}
+        isAdmin={isAdmin}
+        onMatchWinConditionClick={onMatchWinConditionClick}
+        canSwap={canSwap}
+        swapSelected={swapSelected}
+        onPlayerClick={handlePlayerClick}
+      />
+    );
   }
 
-  return <DoubleBracketView matches={matches} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />;
+  return (
+    <DoubleBracketView
+      matches={matches}
+      onMatchClick={onMatchClick}
+      isAdmin={isAdmin}
+      onMatchWinConditionClick={onMatchWinConditionClick}
+      canSwap={canSwap}
+      swapSelected={swapSelected}
+      onPlayerClick={handlePlayerClick}
+    />
+  );
 }
 
-function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick }) {
+function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick, canSwap, swapSelected, onPlayerClick }) {
   const rounds = groupByRound(matches);
   const hasPrelims = rounds.length > 0 && rounds[0].length < rounds[1]?.length;
   const lastRound = rounds[rounds.length - 1];
@@ -168,7 +227,7 @@ function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
             <h4>{getRoundName(roundMatches, roundIndex === rounds.length - 1, roundIndex === 0, hasPrelims)}</h4>
             <div className="round-matches">
               {roundMatches.map((match) => (
-                <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
+                <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} canSwap={canSwap} swapSelected={swapSelected} onPlayerClick={onPlayerClick} />
               ))}
             </div>
           </div>
@@ -184,7 +243,7 @@ function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
   );
 }
 
-function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick }) {
+function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinConditionClick, canSwap, swapSelected, onPlayerClick }) {
   const wbMatches = matches.filter(m => m.bracket === 'winners');
   const lbMatches = matches.filter(m => m.bracket === 'losers');
   const gfMatches = matches.filter(m => m.bracket === 'grandFinal');
@@ -223,11 +282,15 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
                 <h4>{getWbRoundName(roundMatches, roundIndex, wbRounds.length)}</h4>
                 <div className="round-matches">
                   {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
+                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} canSwap={canSwap} swapSelected={swapSelected} onPlayerClick={onPlayerClick} />
                   ))}
                 </div>
               </div>
             ))}
+            <GrandFinalMatch match={gfM0} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final" onMatchWinConditionClick={onMatchWinConditionClick} canSwap={canSwap} swapSelected={swapSelected} onPlayerClick={onPlayerClick} />
+            {(gfM1Active || gfM1?.winner != null) && (
+              <GrandFinalMatch match={gfM1} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final Reset" onMatchWinConditionClick={onMatchWinConditionClick} canSwap={canSwap} swapSelected={swapSelected} onPlayerClick={onPlayerClick} />
+            )}
           </div>
         </div>
 
@@ -239,21 +302,11 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
                 <h4>{getLbRoundName(roundMatches, roundIndex, lbRounds.length)}</h4>
                 <div className="round-matches">
                   {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} />
+                    <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} isAdmin={isAdmin} onMatchWinConditionClick={onMatchWinConditionClick} canSwap={canSwap} swapSelected={swapSelected} onPlayerClick={onPlayerClick} />
                   ))}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        <div className="de-section">
-          <h4 className="de-section-title">Grand Final</h4>
-          <div className="bracket-rounds gf-rounds">
-            <GrandFinalMatch match={gfM0} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final" onMatchWinConditionClick={onMatchWinConditionClick} />
-            {(gfM1Active || gfM1?.winner != null) && (
-              <GrandFinalMatch match={gfM1} onMatchClick={onMatchClick} isAdmin={isAdmin} label="Grand Final Reset" onMatchWinConditionClick={onMatchWinConditionClick} />
-            )}
           </div>
         </div>
       </div>

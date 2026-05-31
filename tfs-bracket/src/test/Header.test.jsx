@@ -81,8 +81,8 @@ describe("Header", () => {
     expect(onInvite).toHaveBeenCalledTimes(1);
   });
 
-  it("renders version badge", () => {
-    render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
-    expect(screen.getByText("beta-v0.1")).toBeInTheDocument();
+  it("renders version badges", () => {
+    const { container } = render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
+    expect(container.querySelectorAll(".version-badge").length).toBeGreaterThan(0);
   });
 });

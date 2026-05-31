@@ -1,0 +1,38 @@
+[
+  {
+    "version": "beta-v0.2",
+    "date": "2026-06-01",
+    "notes": [
+      "Leaderboard: view cumulative scores across all tournaments in real time",
+      "Player management: edit or remove participants before the tournament starts",
+      "Custom scoring: set how many points each finishing rank is worth",
+      "Auto-scoring: points are automatically awarded when a tournament completes",
+      "Navigation: quick links to switch between Tournaments and Leaderboard",
+      "Score badges: see each player's total points next to their name in the rankings",
+      "Disqualification: mark a player as DQ'd instead of entering a numeric score",
+      "Smoother interface: improved button feedback, transitions, and animations throughout the app",
+      "Fix resolutions: white screen when navigating between pages",
+      "Fix resolutions: page crash when switching to or from Leaderboard",
+      "Fix resolutions: error popup about React hooks ordering"
+    ]
+  },
+  {
+    "version": "beta-v0.1",
+    "date": "2026-05-15",
+    "notes": [
+      "Invite-only access: only invited users can log in",
+      "Role system: Super Admin, Tournament Admin, and Player roles",
+      "Single & double elimination brackets: supports odd number of players and grand final reset",
+      "Score recording: click a match to enter scores via a compact modal",
+      "Win conditions: configure how many wins are needed per match",
+      "Player swap: admins can move players between unfilled match slots",
+      "Round names: matches show their stage (Quarterfinals, Semifinals, Grand Final, etc.)",
+      "Compact bracket view: clean tile layout that fits on screen",
+      "Post-tournament rankings: automatically calculated and displayed with medals",
+      "Participant management: add players manually with name and optional email",
+      "Completed tournaments: marked clearly and sorted to the bottom",
+      "Modern design: updated look with smooth animations throughout",
+      "Security: input validation on all forms"
+    ]
+  }
+]

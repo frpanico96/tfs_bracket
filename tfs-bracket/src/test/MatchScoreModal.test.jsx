@@ -77,7 +77,7 @@ describe("MatchScoreModal", () => {
     await user.click(screen.getAllByRole("button", { name: "1" })[1]); // Bob gets 1
     expect(screen.getByText("Save")).not.toBeDisabled();
     await user.click(screen.getByText("Save"));
-    expect(onSave).toHaveBeenCalledWith(match, { p1Score: 3, p2Score: 1, winnerIndex: 0 });
+    expect(onSave).toHaveBeenCalledWith(match, { p1Score: 3, p2Score: 1, winnerIndex: 0, dq: null });
   });
 
   it("calls onClose and resets scores on close", async () => {
