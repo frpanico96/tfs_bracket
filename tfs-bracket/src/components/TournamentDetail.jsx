@@ -135,24 +135,33 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     onUpdate({ ...t, matches });
 
     const updatedTournament = { ...t, matches };
-    const allDone = !t.scoresAssigned && updatedTournament.matches.every((m) => m.winner != null);
-    if (allDone) {
+    const allDone = updatedTournament.matches.every((m) => m.winner != null);
+    if (allDone && !t.scoresAssigned) {
       const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants);
+      if (!t.rankScores) {
+        console.warn("Awarding scores: no rankScores configured, all points will be 0");
+      }
+      let allSucceeded = true;
       for (const entry of finalRanks) {
         for (const player of entry.players) {
           if (!player.id || player.id.startsWith("manual-") || player.id.startsWith("fake-")) continue;
+          if (entry.points === 0) continue;
           try {
             const userRef = doc(db, "users", player.id);
             const snap = await getDoc(userRef);
             if (snap.exists()) {
               await updateDoc(userRef, { score: increment(entry.points) });
             }
-          } catch {
+          } catch (e) {
+            console.warn("Failed to award score to", player.id, player.name, e);
+            allSucceeded = false;
           }
         }
       }
-      await updateDoc(ref, { scoresAssigned: true });
-      onUpdate({ ...updatedTournament, scoresAssigned: true });
+      if (allSucceeded) {
+        await updateDoc(ref, { scoresAssigned: true });
+        onUpdate({ ...updatedTournament, scoresAssigned: true });
+      }
     }
   };
 
