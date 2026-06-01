@@ -217,6 +217,15 @@ service cloud.firestore {
         && request.resource.data.adminId == request.auth.uid;
     }
 
+    function canJoinTournament() {
+      return resource.data.published == true
+        && request.time >= resource.data.regStart
+        && request.time < resource.data.regEnd
+        && resource.data.participants.size() < resource.data.maxParticipants
+        && request.resource.data.participants.size() == resource.data.participants.size() + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participants"]);
+    }
+
     match /tournaments/{tournamentId} {
       allow read: if request.auth != null
         && (resource.data.published == true
@@ -226,7 +235,8 @@ service cloud.firestore {
         && isAdmin()
         && isValidTournament();
       allow update: if request.auth != null
-        && request.auth.uid == resource.data.adminId;
+        && (request.auth.uid == resource.data.adminId
+            || canJoinTournament());
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.adminId;
     }
