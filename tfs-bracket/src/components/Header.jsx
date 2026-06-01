@@ -15,7 +15,7 @@ function Avatar({ user }) {
   return <div className="avatar avatar-fallback">{getInitials(name)}</div>;
 }
 
-export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
+export default function Header({ user, role, isSuperAdmin, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
   const displayName = getUserName(user);
 
   return (
@@ -35,7 +35,7 @@ export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick
         <span>{displayName}</span>
         {role && <span className={`role-badge role-${role}`}>{role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>}
         <div className="header-actions">
-          {isSuperAdmin && (
+          {isGlobalAdmin && (
             <button className="btn-invite" onClick={onInvite}>
               + Invite
             </button>

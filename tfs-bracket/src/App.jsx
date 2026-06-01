@@ -109,6 +109,15 @@ function App() {
     }
   }, [view, isGlobalAdmin]);
 
+  useEffect(() => {
+    if (!inviteResult) return;
+    const url = new URL(window.location);
+    if (url.searchParams.has("invite")) {
+      url.searchParams.delete("invite");
+      window.history.replaceState({}, "", url);
+    }
+  }, [inviteResult]);
+
   const handleLogin = (provider) => async () => {
     try {
       if (provider === "discord") {
@@ -198,6 +207,7 @@ function App() {
         user={user}
         role={role}
         isSuperAdmin={isSuperAdmin}
+        isGlobalAdmin={isGlobalAdmin}
         onLogout={handleLogout}
         onLogoClick={() => setView("list")}
         onInvite={() => setShowInviteModal(true)}
@@ -259,6 +269,7 @@ function App() {
       {showInviteModal && (
         <InviteModal
           user={user}
+          isSuperAdmin={isSuperAdmin}
           onClose={() => setShowInviteModal(false)}
         />
       )}

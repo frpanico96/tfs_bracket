@@ -2,10 +2,10 @@ import { useState } from "react";
 import { createInvite, createGenericInvite, buildInviteLink, INVITE_ROLES } from "../utils/invite";
 import { logEvent } from "../utils/logger";
 
-export default function InviteModal({ user, onClose }) {
+export default function InviteModal({ user, onClose, isSuperAdmin }) {
   const [mode, setMode] = useState("email");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("tournament_admin");
+  const [role, setRole] = useState(isSuperAdmin ? "tournament_admin" : "player");
   const [maxUses, setMaxUses] = useState(10);
   const [expiresAt, setExpiresAt] = useState("");
   const [link, setLink] = useState("");
@@ -18,7 +18,7 @@ export default function InviteModal({ user, onClose }) {
     e.preventDefault();
     setError("");
 
-    if (mode === "email") {
+    if (isSuperAdmin && mode === "email") {
       const trimmed = email.trim().toLowerCase();
       if (!trimmed.endsWith("@gmail.com")) {
         setError("Only @gmail.com emails are supported");
@@ -87,30 +87,35 @@ export default function InviteModal({ user, onClose }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const title = isSuperAdmin ? "Invite User" : "Create Invite Link";
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Invite User</h3>
+          <h3>{title}</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         {!link ? (
           <form onSubmit={handleGenerate}>
             <div className="modal-body">
-              <div className="invite-mode-tabs">
-                <button type="button" className={`invite-mode-tab ${mode === "email" ? "active" : ""}`} onClick={() => setMode("email")}>
-                  Email Invite
-                </button>
-                <button type="button" className={`invite-mode-tab ${mode === "link" ? "active" : ""}`} onClick={() => setMode("link")}>
-                  Link Invite
-                </button>
-              </div>
+              {isSuperAdmin && (
+                <div className="invite-mode-tabs">
+                  <button type="button" className={`invite-mode-tab ${mode === "email" ? "active" : ""}`} onClick={() => setMode("email")}>
+                    Email Invite
+                  </button>
+                  <button type="button" className={`invite-mode-tab ${mode === "link" ? "active" : ""}`} onClick={() => setMode("link")}>
+                    Link Invite
+                  </button>
+                </div>
+              )}
 
-              {mode === "email" ? (
+              {isSuperAdmin && mode === "email" ? (
                 <>
                   <div className="modal-field">
-                    <label>Email (@gmail.com only)</label>
+                    <label htmlFor="invite-email">Email (@gmail.com only)</label>
                     <input
+                      id="invite-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -118,31 +123,34 @@ export default function InviteModal({ user, onClose }) {
                       required
                     />
                   </div>
-                  <div className="modal-field">
-                    <label>Role</label>
-                    <div className="modal-options">
-                      {INVITE_ROLES.map((r) => (
-                        <button
-                          key={r.value}
-                          type="button"
-                          className={`modal-option ${role === r.value ? "selected" : ""}`}
-                          onClick={() => setRole(r.value)}
-                        >
-                          <div>
-                            <div>{r.label}</div>
-                            <div className="modal-option-desc">{r.desc}</div>
-                          </div>
-                        </button>
-                      ))}
+                  {isSuperAdmin && (
+                    <div className="modal-field">
+                      <label>Role</label>
+                      <div className="modal-options">
+                        {INVITE_ROLES.map((r) => (
+                          <button
+                            key={r.value}
+                            type="button"
+                            className={`modal-option ${role === r.value ? "selected" : ""}`}
+                            onClick={() => setRole(r.value)}
+                          >
+                            <div>
+                              <div>{r.label}</div>
+                              <div className="modal-option-desc">{r.desc}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               ) : (
                 <>
                   <p className="modal-desc">Anyone with this link can join as a Player until it expires or reaches the max uses.</p>
                   <div className="modal-field">
-                    <label>Max Uses</label>
+                    <label htmlFor="invite-max-uses">Max Uses</label>
                     <input
+                      id="invite-max-uses"
                       type="number"
                       min="1"
                       value={maxUses}
@@ -151,18 +159,21 @@ export default function InviteModal({ user, onClose }) {
                     />
                   </div>
                   <div className="modal-field">
-                    <label>Expires At</label>
+                    <label htmlFor="invite-expires-at">Expires At</label>
                     <input
+                      id="invite-expires-at"
                       type="datetime-local"
                       value={expiresAt}
                       onChange={(e) => setExpiresAt(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="modal-field">
-                    <label>Role</label>
-                    <p className="invite-role-locked">Player</p>
-                  </div>
+                  {isSuperAdmin && (
+                    <div className="modal-field">
+                      <label>Role</label>
+                      <p className="invite-role-locked">Player</p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -181,18 +192,16 @@ export default function InviteModal({ user, onClose }) {
               <p className={`invite-success ${isExisting ? "invite-success-muted" : ""}`}>
                 {isExisting ? "Invite already exists! Here is the existing link:" : "Invite created successfully!"}
               </p>
-              {mode === "email" && (
+              {isSuperAdmin && mode === "email" && (
                 <p className="invite-hint">
                   Send this link to <strong>{email}</strong>. They will be registered as{" "}
                   <strong>{INVITE_ROLES.find((r) => r.value === role)?.label}</strong>.
                 </p>
               )}
-              {mode === "link" && (
-                <p className="invite-hint">
-                  This link expires on <strong>{new Date(expiresAt).toLocaleString()}</strong> and can be used up to <strong>{maxUses}</strong> times.
-                  Anyone with this link will be registered as <strong>Player</strong>.
-                </p>
-              )}
+              <p className="invite-hint">
+                This link expires on <strong>{new Date(expiresAt).toLocaleString()}</strong> and can be used up to <strong>{maxUses}</strong> times.
+                Anyone with this link will be registered as <strong>Player</strong>.
+              </p>
               <div className="modal-field">
                 <label>Invite Link</label>
                 <div className="invite-link-box">

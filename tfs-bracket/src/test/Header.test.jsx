@@ -58,17 +58,19 @@ describe("Header", () => {
     expect(screen.getByText("Tournament Admin")).toBeInTheDocument();
   });
 
-  it("shows Invite button when isSuperAdmin is true", () => {
-    render(<Header user={mockUser} isSuperAdmin={true} onLogout={() => {}} onLogoClick={() => {}} />);
+  it("shows Invite button when isGlobalAdmin is true", () => {
+    render(<Header user={mockUser} isGlobalAdmin={true} onLogout={() => {}} onNavigate={() => {}} onVersionClick={() => {}} />);
     expect(screen.getByText("+ Invite")).toBeInTheDocument();
   });
 
-  it("hides Invite button when isSuperAdmin is false", () => {
-    render(<Header user={mockUser} isSuperAdmin={false} onLogout={() => {}} onLogoClick={() => {}} />);
+  it("hides Invite button when isGlobalAdmin is false", () => {
+
+    render(<Header user={mockUser} isGlobalAdmin={false} onLogout={() => {}} onLogoClick={() => {}} />);
+
     expect(screen.queryByText("+ Invite")).not.toBeInTheDocument();
   });
 
-  it("hides Invite button when isSuperAdmin is not provided", () => {
+  it("hides Invite button when isGlobalAdmin is not provided", () => {
     render(<Header user={mockUser} onLogout={() => {}} onLogoClick={() => {}} />);
     expect(screen.queryByText("+ Invite")).not.toBeInTheDocument();
   });
@@ -76,7 +78,7 @@ describe("Header", () => {
   it("calls onInvite when Invite button is clicked", async () => {
     const onInvite = vi.fn();
     const user = userEvent.setup();
-    render(<Header user={mockUser} isSuperAdmin={true} onLogout={() => {}} onLogoClick={() => {}} onInvite={onInvite} />);
+    render(<Header user={mockUser} isGlobalAdmin={true} onLogout={() => {}} onInvite={onInvite} onNavigate={() => {}} onVersionClick={() => {}} />);
     await user.click(screen.getByText("+ Invite"));
     expect(onInvite).toHaveBeenCalledTimes(1);
   });
