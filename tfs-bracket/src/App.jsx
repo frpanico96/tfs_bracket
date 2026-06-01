@@ -28,7 +28,8 @@ import useUserRole from "./hooks/useUserRole";
 
 function App() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState("list");
+  const [authReady, setAuthReady] = useState(false);
+  const [view, setView] = useState(() => localStorage.getItem("tfs_view") || "list");
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -37,13 +38,47 @@ function App() {
     return params.get("invite") || null;
   });
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const [pendingTournamentId, setPendingTournamentId] = useState(() => {
+    const v = localStorage.getItem("tfs_view");
+    if (v === "detail") return localStorage.getItem("tfs_tournamentId") || null;
+    return null;
+  });
   const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
   const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized } = useUserRole(user, inviteToken);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem("tfs_view", view);
+    if (view === "detail" && selectedTournament) {
+      localStorage.setItem("tfs_tournamentId", selectedTournament.id);
+    } else {
+      localStorage.removeItem("tfs_tournamentId");
+    }
+  }, [view, selectedTournament, user]);
+
+  useEffect(() => {
+    if (pendingTournamentId && tournaments.length > 0) {
+      const match = tournaments.find((t) => t.id === pendingTournamentId);
+      if (match) {
+        setSelectedTournament(match);
+        setPendingTournamentId(null);
+      } else {
+        setView("list");
+        setSelectedTournament(null);
+        setPendingTournamentId(null);
+        localStorage.removeItem("tfs_view");
+        localStorage.removeItem("tfs_tournamentId");
+      }
+    }
+  }, [tournaments, pendingTournamentId]);
 
   useEffect(() => {
     if (loading || view === "leaderboard") return;
@@ -90,6 +125,8 @@ function App() {
     await logOut();
     setView("list");
     setSelectedTournament(null);
+    localStorage.removeItem("tfs_view");
+    localStorage.removeItem("tfs_tournamentId");
   };
 
   const handleDeleteTournament = async (tournamentId) => {
@@ -101,6 +138,18 @@ function App() {
     setView("list");
     setSelectedTournament(null);
   };
+
+  if (!authReady) {
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <h1>TFS Bracket</h1>
+          <div className="loading-spinner" />
+          <p className="loading-text">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

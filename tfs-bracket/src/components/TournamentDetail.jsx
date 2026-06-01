@@ -43,6 +43,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [editParticipantEmail, setEditParticipantEmail] = useState("");
   const [showRankScores, setShowRankScores] = useState(false);
   const [rankScoreValues, setRankScoreValues] = useState([]);
+  const [showJoinConfirm, setShowJoinConfirm] = useState(false);
 
   const rawRankings = useMemo(
     () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
@@ -73,10 +74,14 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const handleJoin = async () => {
+  const handleJoin = () => {
     if (!t.published) return;
     if (t.participants.some((p) => p.id === user.uid)) return;
     if (t.participants.length >= t.maxParticipants) return;
+    setShowJoinConfirm(true);
+  };
+
+  const handleConfirmJoin = async () => {
     const ref = doc(db, "tournaments", t.id);
     const name = getUserName(user);
     const newParticipant = { id: user.uid, name, email: user.email };
@@ -85,6 +90,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     });
     onUpdate({ ...t, participants: [...t.participants, newParticipant] });
     logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
+    setShowJoinConfirm(false);
+  };
+
+  const handleCancelJoin = () => {
+    setShowJoinConfirm(false);
   };
 
   const handlePublish = async () => {
@@ -636,6 +646,22 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             </button>
           </div>
         </form>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={showJoinConfirm}
+        onClose={handleCancelJoin}
+        title="Join Tournament"
+      >
+        <p>Are you sure you want to join "{t.name}"?</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={handleCancelJoin}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={handleConfirmJoin}>
+            Confirm
+          </button>
+        </div>
       </BaseModal>
 
       <BaseModal
