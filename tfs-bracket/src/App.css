@@ -101,6 +101,26 @@ body {
   font-size: 15px;
 }
 
+.login-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.login-btn-google,
+.login-btn-discord {
+  min-width: 240px;
+}
+
+.login-btn-discord {
+  background: #5865f2;
+}
+
+.login-btn-discord:hover {
+  background: #4752c4;
+}
+
 .app {
   min-height: 100vh;
   display: flex;
@@ -217,6 +237,16 @@ body {
   object-fit: cover;
   background: var(--border-light);
   border: 2px solid var(--border);
+}
+
+.avatar.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  background: var(--primary);
 }
 
 .main {
@@ -2177,4 +2207,55 @@ body {
   left: 2px;
   color: var(--primary-light);
   font-weight: 700;
+}
+
+.invite-mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.invite-mode-tab {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.invite-mode-tab.active {
+  background: var(--primary);
+  color: white;
+}
+
+.invite-mode-tab:not(.active):hover {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.invite-role-locked {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 8px 0;
+  margin: 0;
+}
+
+.invite-success-muted {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.invite-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
 }

@@ -1,26 +1,21 @@
 import { useState, useEffect } from "react";
-import { db, usersRef, query, onSnapshot } from "../firebase";
+import { db, usersRef, query, where, onSnapshot } from "../firebase";
 
 export default function Leaderboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(usersRef);
+    const q = query(usersRef, where("score", ">", 0));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      try {
-        const data = snapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-          .filter((u) => u.score > 0)
-          .sort((a, b) => (b.score || 0) - (a.score || 0));
-        setUsers(data);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
+      const data = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => (b.score || 0) - (a.score || 0));
+      setUsers(data);
+      setLoading(false);
     }, () => {
       setLoading(false);
     });

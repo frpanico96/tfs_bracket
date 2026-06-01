@@ -1,6 +1,23 @@
+import { useState } from "react";
 import VersionBadges from "./VersionBadges";
+import { getUserName, getUserPhoto, getInitials } from "../utils/user";
+
+function Avatar({ user }) {
+  const [broken, setBroken] = useState(false);
+  const photo = getUserPhoto(user);
+  const name = getUserName(user);
+  const showImg = photo && !broken;
+
+  if (showImg) {
+    return <img src={photo} alt="" className="avatar" onError={() => setBroken(true)} />;
+  }
+
+  return <div className="avatar avatar-fallback">{getInitials(name)}</div>;
+}
 
 export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
+  const displayName = getUserName(user);
+
   return (
     <header className="header">
       <div className="header-left">
@@ -14,8 +31,8 @@ export default function Header({ user, role, isSuperAdmin, onLogout, onLogoClick
         </nav>
       </div>
       <div className="user-info">
-        <img src={user.photoURL} alt="" className="avatar" />
-        <span>{user.displayName}</span>
+        <Avatar user={user} />
+        <span>{displayName}</span>
         {role && <span className={`role-badge role-${role}`}>{role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>}
         <div className="header-actions">
           {isSuperAdmin && (

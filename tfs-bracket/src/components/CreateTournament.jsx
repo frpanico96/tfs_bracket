@@ -5,6 +5,7 @@ import {
   serverTimestamp,
 } from "../firebase";
 import { logEvent } from "../utils/logger";
+import { getUserName } from "../utils/user";
 
 export default function CreateTournament({ user, onCancel, onCreated }) {
   const [name, setName] = useState("");
@@ -40,7 +41,8 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         regEnd: new Date(regEnd),
         createdAt: serverTimestamp(),
         adminId: user.uid,
-        adminName: user.displayName,
+        adminName: getUserName(user),
+
         published: false,
         started: false,
         bracketType,
@@ -54,7 +56,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         regStart: new Date(regStart),
         regEnd: new Date(regEnd),
         adminId: user.uid,
-        adminName: user.displayName,
+        adminName: getUserName(user),
         published: false,
         started: false,
         bracketType,

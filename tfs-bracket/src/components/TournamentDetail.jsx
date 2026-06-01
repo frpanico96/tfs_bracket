@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { db, doc, updateDoc, getDoc, increment } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
+import { getUserName } from "../utils/user";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
@@ -77,12 +78,13 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (t.participants.some((p) => p.id === user.uid)) return;
     if (t.participants.length >= t.maxParticipants) return;
     const ref = doc(db, "tournaments", t.id);
-    const newParticipant = { id: user.uid, name: user.displayName, email: user.email };
+    const name = getUserName(user);
+    const newParticipant = { id: user.uid, name, email: user.email };
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
     });
     onUpdate({ ...t, participants: [...t.participants, newParticipant] });
-    logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: user.displayName } });
+    logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
   };
 
   const handlePublish = async () => {

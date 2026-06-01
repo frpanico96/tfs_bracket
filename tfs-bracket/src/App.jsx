@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   signInWithGoogle,
+  signInWithDiscord,
   logOut,
   auth,
   db,
@@ -22,6 +23,7 @@ import Leaderboard from "./components/Leaderboard";
 import InviteModal from "./components/InviteModal";
 import ReleaseNotes from "./components/ReleaseNotes";
 import VersionBadges from "./components/VersionBadges";
+import RestrictedAccess from "./components/RestrictedAccess";
 import useUserRole from "./hooks/useUserRole";
 
 function App() {
@@ -72,9 +74,13 @@ function App() {
     }
   }, [view, isGlobalAdmin]);
 
-  const handleLogin = async () => {
+  const handleLogin = (provider) => async () => {
     try {
-      await signInWithGoogle();
+      if (provider === "discord") {
+        await signInWithDiscord();
+      } else {
+        await signInWithGoogle();
+      }
     } catch (e) {
       alert("Login failed: " + e.message);
     }
@@ -103,9 +109,14 @@ function App() {
           <div className="login-box">
             <h1>TFS Bracket <VersionBadges onVersionClick={() => setShowReleaseNotes(true)} /></h1>
             <p>Create and manage tournament brackets</p>
-            <button className="btn-primary" onClick={handleLogin}>
-              Sign in with Google
-            </button>
+            <div className="login-buttons">
+              <button className="btn-primary login-btn-google" onClick={handleLogin("google")}>
+                Sign in with Google
+              </button>
+              <button className="btn-primary login-btn-discord" onClick={handleLogin("discord")}>
+                Sign in with Discord
+              </button>
+            </div>
           </div>
         </div>
         <ReleaseNotes
@@ -129,18 +140,7 @@ function App() {
   }
 
   if (isAuthorized === false) {
-    return (
-      <div className="app">
-         <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
-        <main className="main">
-          <div className="access-denied">
-            <h2>Access Restricted</h2>
-            <p>This application is currently in private testing.</p>
-            <p>You need an invitation link to access it.</p>
-          </div>
-        </main>
-      </div>
-    );
+    return <RestrictedAccess user={user} onLogout={handleLogout} />;
   }
 
   return (
@@ -162,7 +162,7 @@ function App() {
             {inviteResult.success
               ? `Invite accepted! You are now registered as ${inviteResult.role.replace("_", " ")}.`
               : inviteResult.reason === "invalid"
-              ? "This invite link is invalid or has already been used."
+              ? "This invite link is invalid, expired, or has reached its maximum uses."
               : inviteResult.reason === "error"
               ? "Failed to process invite. Check the console or try again."
               : "This invite was sent to a different email address."}

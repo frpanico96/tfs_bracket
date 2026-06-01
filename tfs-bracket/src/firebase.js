@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, collection, addDoc, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, increment } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getFirestore, collection, addDoc, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, increment, runTransaction } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
@@ -16,8 +16,14 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
+const discordProvider = new OAuthProvider("oidc.discord.com");
+
+discordProvider.addScope("identify");
+discordProvider.addScope("email");
+discordProvider.setCustomParameters({ prompt: "consent" });
 
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithDiscord = () => signInWithPopup(auth, discordProvider);
 export const logOut = () => signOut(auth);
 
 export const tournamentsRef = collection(db, "tournaments");
@@ -39,4 +45,5 @@ export {
   onSnapshot,
   serverTimestamp,
   increment,
+  runTransaction,
 };

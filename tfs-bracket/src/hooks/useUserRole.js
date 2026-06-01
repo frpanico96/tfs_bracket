@@ -1,28 +1,58 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, db } from "../firebase";
 import { getInviteByToken, consumeInvite, isEmailInvited } from "../utils/invite";
+import { getUserName } from "../utils/user";
 
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMINS || "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+const ALLOW_OPEN_REGISTRATION = import.meta.env.VITE_ALLOW_OPEN_REGISTRATION === "true";
+
+function getProvider(user) {
+  const p = user.providerData?.[0];
+  if (!p) return "google";
+  if (p.providerId === "oidc.discord.com") return "discord";
+  return "google";
+}
+
 function getFallbackRole(user) {
   return ADMIN_EMAILS.includes(user?.email?.toLowerCase()) ? "admin" : "player";
 }
 
+function buildUserData(user, role, provider, email) {
+  const data = {
+    role,
+    name: getUserName(user),
+    provider,
+    createdAt: serverTimestamp(),
+  };
+  if (email) data.email = email;
+  return data;
+}
+
 export default function useUserRole(user, inviteToken) {
   const [role, setRole] = useState(null);
-  const [loading, setLoading] = useState(!user);
+  const [loading, setLoading] = useState(true);
   const [inviteResult, setInviteResult] = useState(null);
-  const [isAuthorized, setIsAuthorized] = useState(!user ? null : false);
+  const [isAuthorized, setIsAuthorized] = useState(null);
+  const lastValidation = useRef(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      setIsAuthorized(null);
+      return;
+    }
 
     let cancelled = false;
 
     (async () => {
+      const now = Date.now();
+      if (inviteToken && now - lastValidation.current < 2000) return;
+      lastValidation.current = now;
+
       try {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
@@ -30,70 +60,81 @@ export default function useUserRole(user, inviteToken) {
         if (cancelled) return;
 
         let resolvedRole;
+        let registeredViaInvite = false;
+        let userDocExists = snap.exists();
+        const provider = getProvider(user);
+        const email = user.email?.toLowerCase();
 
-        if (snap.exists()) {
-          resolvedRole = snap.data().role || "player";
-          if (inviteToken) {
-            const invite = await getInviteByToken(inviteToken);
-            if (invite && invite.email === user.email) {
-              resolvedRole = invite.role;
-              await updateDoc(ref, { role: resolvedRole });
-              await consumeInvite(invite.id);
-              if (!cancelled) setInviteResult({ success: true, role: resolvedRole });
-            } else if (!invite) {
-              if (!cancelled) setInviteResult({ success: false, reason: "invalid" });
-            } else {
-              if (!cancelled) setInviteResult({ success: false, reason: "email_mismatch" });
-            }
+        const handleInvite = async (invite) => {
+          resolvedRole = invite.role;
+          registeredViaInvite = true;
+
+          const userData = buildUserData(user, resolvedRole, provider, email);
+          userData.registeredViaInvite = true;
+
+          if (snap.exists()) {
+            await updateDoc(ref, userData);
+          } else {
+            await setDoc(ref, userData);
           }
-        } else {
-          if (inviteToken) {
-            const invite = await getInviteByToken(inviteToken);
-            if (invite && invite.email === user.email) {
-              resolvedRole = invite.role;
-              await setDoc(ref, {
-                role: resolvedRole,
-                email: user.email,
-                name: user.displayName,
-                createdAt: serverTimestamp(),
-              });
-              await consumeInvite(invite.id);
-              if (!cancelled) setInviteResult({ success: true, role: resolvedRole });
-            } else if (!invite) {
-              if (!cancelled) setInviteResult({ success: false, reason: "invalid" });
+
+          await consumeInvite(invite.id);
+          userDocExists = true;
+          if (!cancelled) setInviteResult({ success: true, role: resolvedRole });
+        };
+
+        if (inviteToken) {
+          const invite = await getInviteByToken(inviteToken);
+          if (invite) {
+            if (invite.email) {
+              if (invite.email === email) {
+                await handleInvite(invite);
+              } else {
+                if (!cancelled) setInviteResult({ success: false, reason: "email_mismatch" });
+              }
             } else {
-              if (!cancelled) setInviteResult({ success: false, reason: "email_mismatch" });
+              await handleInvite(invite);
             }
+          } else {
+            if (!cancelled) setInviteResult({ success: false, reason: "invalid" });
           }
-          if (!resolvedRole) {
+        }
+
+        if (!resolvedRole) {
+          if (userDocExists) {
+            resolvedRole = snap.data().role || "player";
+            registeredViaInvite = !!snap.data().registeredViaInvite;
+          } else {
             resolvedRole = getFallbackRole(user);
-            await setDoc(ref, {
-              role: resolvedRole,
-              email: user.email,
-              name: user.displayName,
-              createdAt: serverTimestamp(),
-            });
+            const shouldCreateDoc = ALLOW_OPEN_REGISTRATION || ADMIN_EMAILS.includes(email);
+            if (shouldCreateDoc) {
+              await setDoc(ref, buildUserData(user, resolvedRole, provider, email));
+              userDocExists = true;
+            }
           }
         }
 
         if (!cancelled) setRole(resolvedRole);
 
-        const email = user.email?.toLowerCase();
         if (ADMIN_EMAILS.includes(email)) {
           if (!cancelled) setIsAuthorized(true);
+        } else if (registeredViaInvite) {
+          if (!cancelled) setIsAuthorized(true);
+        } else if (userDocExists) {
+          if (!cancelled) setIsAuthorized(true);
+        } else if (email && (await isEmailInvited(email))) {
+          if (!cancelled) setIsAuthorized(true);
+        } else if (ALLOW_OPEN_REGISTRATION) {
+          if (!cancelled) setIsAuthorized(true);
         } else {
-          try {
-            const invited = await isEmailInvited(email);
-            if (!cancelled) setIsAuthorized(invited);
-          } catch {
-            if (!cancelled) setIsAuthorized(false);
-          }
+          if (!cancelled) setIsAuthorized(false);
         }
       } catch (err) {
         console.warn("useUserRole: invite processing failed", err);
         if (!cancelled) {
           if (inviteToken) setInviteResult({ success: false, reason: "error" });
           setRole(getFallbackRole(user));
+          if (!ALLOW_OPEN_REGISTRATION) setIsAuthorized(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
