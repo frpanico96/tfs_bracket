@@ -17,6 +17,7 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave, bracke
   const [p1Score, setP1Score] = useState(0);
   const [p2Score, setP2Score] = useState(0);
   const [dq, setDq] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   if (!match) return null;
 
@@ -27,21 +28,24 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave, bracke
     setP1Score(0);
     setP2Score(0);
     setDq(null);
+    setSaving(false);
     onClose();
   };
 
   const isDqActive = dq === 0 || dq === 1;
   const isScoreValid = isDqActive || (p1Score !== p2Score && Math.max(p1Score, p2Score) === target && Math.max(p1Score, p2Score) > 0);
 
-  const handleSave = () => {
-    if (!isScoreValid) return;
+  const handleSave = async () => {
+    if (!isScoreValid || saving) return;
+    setSaving(true);
     if (isDqActive) {
       const winnerIndex = dq === 0 ? 1 : 0;
-      onSave(match, { p1Score: null, p2Score: null, winnerIndex, dq });
+      await onSave(match, { p1Score: null, p2Score: null, winnerIndex, dq });
     } else {
       const winnerIndex = p1Score > p2Score ? 0 : 1;
-      onSave(match, { p1Score, p2Score, winnerIndex, dq: null });
+      await onSave(match, { p1Score, p2Score, winnerIndex, dq: null });
     }
+    await new Promise(r => setTimeout(r, 400));
     handleClose();
   };
 
@@ -60,6 +64,7 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave, bracke
               onDQ={() => setDq(dq === 0 ? null : 0)}
               isDQ={dq === 0}
               isDQOpponent={dq === 1}
+              disabled={saving}
             />
             <div className="match-score-display">
               {isDqActive ? (
@@ -85,14 +90,16 @@ export default function MatchScoreModal({ isOpen, onClose, match, onSave, bracke
               onDQ={() => setDq(dq === 1 ? null : 1)}
               isDQ={dq === 1}
               isDQOpponent={dq === 0}
+              disabled={saving}
             />
           </div>
           <div className="match-score-actions">
-            <button className="btn-secondary" onClick={handleClose}>
+            <button className="btn-secondary" onClick={handleClose} disabled={saving}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={handleSave} disabled={!isScoreValid}>
-              Save
+            <button className="btn-primary" onClick={handleSave} disabled={!isScoreValid || saving}>
+              {saving ? <span className="saving-throbber" /> : null}
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
           {!isScoreValid && !isDqActive && (

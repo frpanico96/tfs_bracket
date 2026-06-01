@@ -813,6 +813,9 @@ function computeDoubleElimRankings(allMatches, rankScores) {
   const gfM0 = allMatches.find(m => m.id === 'gf-m0');
   const gfM1 = allMatches.find(m => m.id === 'gf-m1');
 
+  const gfPopulated = gfM1 && gfM1.player1 && gfM1.player1 !== "TBD" && gfM1.player2 && gfM1.player2 !== "TBD";
+  if (gfPopulated && gfM1.winner == null) return [];
+
   let lastGf;
   if (gfM1 && gfM1.winner != null) lastGf = gfM1;
   else if (gfM0 && gfM0.winner != null) lastGf = gfM0;

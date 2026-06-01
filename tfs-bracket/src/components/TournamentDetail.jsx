@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db, doc, updateDoc, getDoc, increment } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
@@ -43,12 +43,27 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [showRankScores, setShowRankScores] = useState(false);
   const [rankScoreValues, setRankScoreValues] = useState([]);
 
-  const rankings = t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [];
+  const rawRankings = useMemo(
+    () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
+    [t.matches, t.bracketType, t.rankScores, t.participants]
+  );
 
-  const isComplete = () => {
-    if (!t.started || !t.matches || t.matches.length === 0) return false;
-    return t.matches.every((m) => m.winner != null);
-  };
+  const [rankingsReady, setRankingsReady] = useState(false);
+
+  useEffect(() => {
+    if (rawRankings.length > 0) {
+      const id = setTimeout(() => setRankingsReady(true), 600);
+      return () => clearTimeout(id);
+    }
+    const id = setTimeout(() => setRankingsReady(false), 0);
+    return () => clearTimeout(id);
+  }, [rawRankings]);
+
+  const rankings = rankingsReady ? rawRankings : [];
+  const rankingsLoading = rawRankings.length > 0 && !rankingsReady;
+  const rankingsInfo = t.started && rawRankings.length === 0 && t.matches?.some(m => m.isPlayed);
+
+  const isTournamentComplete = t.matches?.length > 0 && t.matches.every((m) => m.winner != null);
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -497,6 +512,10 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         onSwapQuickModeToggle={setSwapQuickMode}
         isAdmin={isAdmin}
         rankings={rankings}
+        rankingsLoading={rankingsLoading}
+        rankingsInfo={rankingsInfo}
+        tournamentComplete={isTournamentComplete}
+        onOpenRankScores={handleOpenRankScores}
       />
 
       <MatchScoreModal

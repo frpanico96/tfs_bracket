@@ -5,7 +5,7 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function PlayerColumn({ name, score, scoreButtons, onSelectScore, onDQ, isDQ, isDQOpponent }) {
+export default function PlayerColumn({ name, score, scoreButtons, onSelectScore, onDQ, isDQ, isDQOpponent, disabled }) {
   if (!name || name === "TBD") {
     return (
       <div className="player-column">
@@ -30,6 +30,7 @@ export default function PlayerColumn({ name, score, scoreButtons, onSelectScore,
           <button
             className={`score-btn dq-btn ${isDQ ? "selected" : ""}`}
             onClick={() => onDQ()}
+            disabled={disabled}
           >
             DQ
           </button>
@@ -37,9 +38,9 @@ export default function PlayerColumn({ name, score, scoreButtons, onSelectScore,
         {scoreButtons.map((btn) => (
           <button
             key={btn}
-            className={`score-btn ${score === btn ? "selected" : ""} ${isAnyDq ? "disabled" : ""}`}
-            onClick={() => !isAnyDq && onSelectScore(btn)}
-            disabled={isAnyDq}
+            className={`score-btn ${score === btn ? "selected" : ""} ${isAnyDq || disabled ? "disabled" : ""}`}
+            onClick={() => !isAnyDq && !disabled && onSelectScore(btn)}
+            disabled={isAnyDq || disabled}
           >
             {btn}
           </button>

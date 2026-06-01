@@ -49,7 +49,7 @@ function RankingsList({ rankings }) {
   );
 }
 
-export default function TournamentSidebar({ isOpen, onToggle, currentCondition, onUpdateCondition, isDev, swapQuickMode, onSwapQuickModeToggle, isAdmin, rankings }) {
+export default function TournamentSidebar({ isOpen, onToggle, currentCondition, onUpdateCondition, isDev, swapQuickMode, onSwapQuickModeToggle, isAdmin, rankings, rankingsLoading, rankingsInfo, tournamentComplete, onOpenRankScores }) {
   const [isConditionModalOpen, setIsConditionModalOpen] = useState(false);
 
   return (
@@ -65,20 +65,31 @@ export default function TournamentSidebar({ isOpen, onToggle, currentCondition, 
               <div className="sidebar-section">
                 <h4>
                   <span className="sidebar-section-icon">⚙️</span>
-                  Win Conditions
+                  Tournament Settings
                 </h4>
                 <div className="sidebar-current">
-                  <span>Default:</span>
+                  <span>Default Win Condition:</span>
                   <button
                     className="sidebar-current-value"
                     onClick={() => setIsConditionModalOpen(true)}
+                    disabled={tournamentComplete}
                   >
                     {currentCondition.toUpperCase()}
                   </button>
                 </div>
                 <p className="sidebar-hint">
-                  Click to change the win condition for all matches
+                  {tournamentComplete ? "Locked after tournament completion" : "Click to change the win condition for all matches"}
                 </p>
+                <div className="sidebar-current">
+                  <span>Tournament Scores:</span>
+                  <button
+                    className="btn-secondary sidebar-scores-btn"
+                    onClick={onOpenRankScores}
+                    disabled={tournamentComplete}
+                  >
+                    Set Scores
+                  </button>
+                </div>
               </div>
             )}
 
@@ -110,7 +121,19 @@ export default function TournamentSidebar({ isOpen, onToggle, currentCondition, 
                 <span className="sidebar-section-icon">🏆</span>
                 Rankings
               </h4>
-              <RankingsList rankings={rankings} />
+              {rankingsLoading ? (
+                <div className="rankings-loading">
+                  <span className="rankings-loading-spinner" />
+                  <span>Calculating...</span>
+                </div>
+              ) : rankingsInfo ? (
+                <div className="rankings-empty">
+                  <span className="rankings-empty-icon">🏆</span>
+                  <p>Tournament must be completed to calculate rankings</p>
+                </div>
+              ) : (
+                <RankingsList rankings={rankings} />
+              )}
             </div>
 
           </div>

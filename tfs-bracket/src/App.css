@@ -72,6 +72,22 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.saving-throbber {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 .login-box h1 {
   margin-bottom: 8px;
   color: var(--primary);
@@ -1678,6 +1694,19 @@ body {
   gap: 6px;
 }
 
+.rankings-list > .rankings-tier {
+  animation: fadeUp 0.3s ease both;
+}
+
+.rankings-list > .rankings-tier:nth-child(1) { animation-delay: 0s; }
+.rankings-list > .rankings-tier:nth-child(2) { animation-delay: 0.08s; }
+.rankings-list > .rankings-tier:nth-child(3) { animation-delay: 0.16s; }
+.rankings-list > .rankings-tier:nth-child(4) { animation-delay: 0.24s; }
+.rankings-list > .rankings-tier:nth-child(5) { animation-delay: 0.32s; }
+.rankings-list > .rankings-tier:nth-child(6) { animation-delay: 0.4s; }
+.rankings-list > .rankings-tier:nth-child(7) { animation-delay: 0.48s; }
+.rankings-list > .rankings-tier:nth-child(8) { animation-delay: 0.56s; }
+
 .rankings-tier {
   background: var(--bg);
   border: 1px solid var(--border-light);
@@ -1780,6 +1809,26 @@ body {
   opacity: 0.4;
 }
 
+.rankings-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  justify-content: center;
+}
+
+.rankings-loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
 .sidebar-section-icon {
   margin-right: 4px;
   font-size: 14px;
@@ -1836,6 +1885,18 @@ body {
   font-size: 12px;
   margin: 0;
   line-height: 1.5;
+}
+
+.tournament-sidebar .sidebar-scores-btn {
+  margin-top: 10px;
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.tournament-sidebar .sidebar-scores-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .tournament-sidebar .sidebar-toggle-row {
