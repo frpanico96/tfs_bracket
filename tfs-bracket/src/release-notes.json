@@ -1,8 +1,21 @@
 [
   {
     "version": "beta-v0.2",
-    "date": "2026-06-01",
+    "date": "2026-06-02",
     "notes": [
+      "Discord login: sign in with Discord (purple button) alongside Google",
+      "Invite links: shareable multi-use invite links with expiry and max-use limits",
+      "Invite modal: tabbed interface for email invites vs link invites",
+      "Avatar fallback: shows coloured initials circle when profile photo is missing",
+      "Registration gate: controlled via VITE_ALLOW_OPEN_REGISTRATION env var (dev only)",
+      "Restricted access: separate page for unauthorised users, no app chrome visible",
+      "Player join: registered players can join open tournaments during registration window",
+      "Security overhaul: Firestore rules rewritten with role-based access on all collections",
+      "Score awarding: tournament admins can award points to participants on completion",
+      "Transaction safety: invite consumption uses runTransaction to prevent race conditions",
+      "Leaderboard filter: only users with score > 0 appear in rankings",
+      "Security headers: X-Frame-Options, HSTS, and other HTTP security headers added",
+      "Env split: .env for UAT deployment, .env.dev for development via vite --mode dev",
       "Leaderboard: view cumulative scores across all tournaments in real time",
       "Player management: edit or remove participants before the tournament starts",
       "Custom scoring: set how many points each finishing rank is worth",

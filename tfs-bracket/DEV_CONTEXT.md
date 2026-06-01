@@ -190,7 +190,19 @@ Total: 110 tests across 11 files
 - `src/components/CreateTournament.jsx`: Input validation for name length, maxParticipants, date ordering
 - `.env.example`: Created for developer onboarding
 
-## Iteration 8: Security Hardening — Firestore Rules, Invite Transaction, Leaderboard
+## Iteration 9: UAT Testing Fixes — Score Awarding, Player Join, Restricted Page
+
+### Changes
+- `firestore.rules`: Users read rule opened to all auth users (admin needs `getDoc` to read player docs before awarding scores). Users update rule allows `score`-only changes (via `diff().affectedKeys().hasOnly(["score"])` or empty diff for `increment(0)` no-ops). Tournament update rule adds `canJoinTournament()` for players to join open tournaments. Invites read/update opened to all auth users (create/delete remain admin-locked).
+- `src/components/TournamentDetail.jsx`: Score award flow now only sets `scoresAssigned` after ALL player updates succeed. Skips `increment(0)` calls. Replaced silent `catch {}` with `console.warn`.
+- `src/components/RestrictedAccess.jsx` + `.css`: Standalone page with gradient background and centered card, no app chrome visible.
+- `.env` / `.env.dev` / `package.json`: Env files split, `vite --mode dev` for dev mode.
+- `src/release-notes.json`: Added `beta-v0.3` entry.
+
+### Key Decisions
+- Users read: any authenticated user can read any user doc. Names/emails are already public via tournament participant lists. This is required for leaderboard queries and admin score-award `getDoc` calls.
+- Users update: any authenticated user can update the `score` field on any user doc. This is required for tournament score awarding. No other fields (role, name, email) can be modified cross-user.
+- Score awarding only marks `scoresAssigned: true` after all player updates succeed. If any fails (e.g., rules deny), the flag stays false and the admin can retry.
 
 ### Security Fixes Applied
 
