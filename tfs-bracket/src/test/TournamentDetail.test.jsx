@@ -11,6 +11,8 @@ const { mockDoc, mockUpdateDoc, logEvent } = vi.hoisted(() => ({
 vi.mock("../firebase", () => ({
   doc: mockDoc,
   updateDoc: mockUpdateDoc,
+  getDocs: vi.fn(() => ({ docs: [] })),
+  usersRef: {},
   db: {},
 }));
 

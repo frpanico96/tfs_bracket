@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { db, doc, updateDoc, getDoc, increment } from "../firebase";
+import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
@@ -36,6 +36,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addParticipantName, setAddParticipantName] = useState("");
   const [addParticipantEmail, setAddParticipantEmail] = useState("");
+  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [addParticipantMode, setAddParticipantMode] = useState("manual");
   const [swapMode, setSwapMode] = useState(false);
   const [swapQuickMode, setSwapQuickMode] = useState(false);
   const [editParticipant, setEditParticipant] = useState(null);
@@ -66,6 +68,18 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const rankingsInfo = t.started && rawRankings.length === 0 && t.matches?.some(m => m.isPlayed);
 
   const isTournamentComplete = t.matches?.length > 0 && t.matches.every((m) => m.winner != null);
+
+  useEffect(() => {
+    if (!showAddParticipant) return;
+    let cancelled = false;
+    (async () => {
+      const snap = await getDocs(usersRef);
+      if (cancelled) return;
+      const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setRegisteredUsers(users);
+    })();
+    return () => { cancelled = true; };
+  }, [showAddParticipant]);
 
   useEffect(() => {
     const checkMobile = () => setSidebarOpen(window.innerWidth > 768);
@@ -202,6 +216,18 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     await updateDoc(ref, { matches: updatedMatches });
     onUpdate({ ...t, matches: updatedMatches });
     logEvent({ action: "update_match_win_condition", details: { tournamentId: t.id, matchId: match.id, newCondition: condition, previousCondition: match.winCondition } });
+  };
+
+  const handleSelectUser = async (regUser) => {
+    if (!isAdmin) return;
+    const ref = doc(db, "tournaments", t.id);
+    const newParticipant = { id: regUser.id, name: regUser.name, email: regUser.email || "" };
+    await updateDoc(ref, {
+      participants: [...t.participants, newParticipant],
+    });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    logEvent({ action: "add_participant", details: { tournamentId: t.id, participantId: regUser.id, participantName: regUser.name } });
+    setShowAddParticipant(false);
   };
 
   const handleAddParticipant = async (e) => {
@@ -576,39 +602,66 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
       <BaseModal
         isOpen={showAddParticipant}
-        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}
+        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); setAddParticipantMode("select"); }}
         title="Add Participant"
       >
-        <form onSubmit={handleAddParticipant}>
-          <label className="modal-field">
-            <span>Name</span>
-            <input
-              type="text"
-              value={addParticipantName}
-              onChange={(e) => setAddParticipantName(e.target.value)}
-              placeholder="Player name"
-              autoFocus
-              required
-            />
-          </label>
-          <label className="modal-field">
-            <span>Email (optional)</span>
-            <input
-              type="email"
-              value={addParticipantEmail}
-              onChange={(e) => setAddParticipantEmail(e.target.value)}
-              placeholder="player@example.com"
-            />
-          </label>
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); }}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={!addParticipantName.trim()}>
-              Add
-            </button>
+        <div className="invite-mode-tabs">
+          <button type="button" className={`invite-mode-tab ${addParticipantMode === "select" ? "active" : ""}`} onClick={() => setAddParticipantMode("select")}>
+            Select User
+          </button>
+          <button type="button" className={`invite-mode-tab ${addParticipantMode === "manual" ? "active" : ""}`} onClick={() => setAddParticipantMode("manual")}>
+            Manual Entry
+          </button>
+        </div>
+
+        {addParticipantMode === "select" ? (
+          <div className="modal-options">
+            {registeredUsers
+              .filter((u) => !t.participants.some((p) => p.id === u.id))
+              .map((u) => (
+                <button key={u.id} type="button" className="modal-option" onClick={() => handleSelectUser(u)}>
+                  <div>
+                    <div>{u.name}</div>
+                    <div className="modal-option-desc">{u.email || ""}</div>
+                  </div>
+                </button>
+              ))}
+            {registeredUsers.filter((u) => !t.participants.some((p) => p.id === u.id)).length === 0 && (
+              <p className="empty">No users available</p>
+            )}
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleAddParticipant}>
+            <label className="modal-field">
+              <span>Name</span>
+              <input
+                type="text"
+                value={addParticipantName}
+                onChange={(e) => setAddParticipantName(e.target.value)}
+                placeholder="Player name"
+                autoFocus
+                required
+              />
+            </label>
+            <label className="modal-field">
+              <span>Email (optional)</span>
+              <input
+                type="email"
+                value={addParticipantEmail}
+                onChange={(e) => setAddParticipantEmail(e.target.value)}
+                placeholder="player@example.com"
+              />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); setAddParticipantMode("select"); }}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={!addParticipantName.trim()}>
+                Add
+              </button>
+            </div>
+          </form>
+        )}
       </BaseModal>
 
       <BaseModal

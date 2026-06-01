@@ -24,6 +24,13 @@
       "Score badges: see each player's total points next to their name in the rankings",
       "Disqualification: mark a player as DQ'd instead of entering a numeric score",
       "Smoother interface: improved button feedback, transitions, and animations throughout the app",
+      "Session persistence: auth state survives page refresh with styled loading screen",
+      "Navigation persistence: current view and selected tournament restored from localStorage",
+      "Join confirmation: modal confirmation step before joining a tournament",
+      "Invite rework: tournament admins see link-only tab with role locked to Player; super admins see both tabs",
+      "Firestore rules: invite creation allowed for tournament admins (isAdmin, not just isSuperAdmin)",
+      "URL cleanup: invite query param removed from URL after processing to prevent re-validation",
+      "Add Participant: tabbed modal with Select User (registered users) and Manual Entry modes",
       "Fix resolutions: white screen when navigating between pages",
       "Fix resolutions: page crash when switching to or from Leaderboard",
       "Fix resolutions: error popup about React hooks ordering"
