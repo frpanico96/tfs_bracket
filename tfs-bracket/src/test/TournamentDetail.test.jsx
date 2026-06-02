@@ -2,16 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { mockDoc, mockUpdateDoc, logEvent } = vi.hoisted(() => ({
+const { mockDoc, mockUpdateDoc, mockAddDoc, logEvent } = vi.hoisted(() => ({
   mockDoc: vi.fn(),
   mockUpdateDoc: vi.fn(),
+  mockAddDoc: vi.fn(() => ({ id: "manual-user-id" })),
   logEvent: vi.fn(),
 }));
 
 vi.mock("../firebase", () => ({
   doc: mockDoc,
   updateDoc: mockUpdateDoc,
+  addDoc: mockAddDoc,
   getDocs: vi.fn(() => ({ docs: [] })),
+  serverTimestamp: vi.fn(() => new Date()),
   usersRef: {},
   db: {},
 }));
@@ -119,8 +122,8 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     );
     await user.click(screen.getByText("+ Add Participant"));
     expect(screen.getByText("Add Participant")).toBeInTheDocument();
+    expect(screen.getByText("Select existing user")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Player name")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("player@example.com")).toBeInTheDocument();
   });
 
   it("disables Add button when name field is empty", async () => {
@@ -139,10 +142,11 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     expect(addButton).toBeDisabled();
   });
 
-  it("submits with valid name and calls updateDoc and onUpdate", async () => {
+  it("submits with valid name and calls addDoc, updateDoc and onUpdate", async () => {
     const onUpdate = vi.fn();
     mockDoc.mockReturnValue({ id: "t-1" });
     mockUpdateDoc.mockResolvedValueOnce();
+    mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
     render(
@@ -159,36 +163,42 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     await user.type(screen.getByPlaceholderText("Player name"), "New Player");
     await user.click(screen.getByText("Add"));
 
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      {},
+      { name: "New Player", provider: "manual", role: "player", createdAt: expect.any(Date) }
+    );
     expect(mockDoc).toHaveBeenCalledWith({}, "tournaments", "t-1");
     expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
     expect(mockUpdateDoc.mock.calls[0][1].participants).toHaveLength(1);
     expect(mockUpdateDoc.mock.calls[0][1].participants[0].name).toBe("New Player");
-    expect(mockUpdateDoc.mock.calls[0][1].participants[0].id).toMatch(/^manual-/);
+    expect(mockUpdateDoc.mock.calls[0][1].participants[0].id).toBe("manual-user-id");
     expect(onUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it("adds participant with email when provided", async () => {
-    const onUpdate = vi.fn();
+  it("rejects duplicate participant name", async () => {
     mockDoc.mockReturnValue({ id: "t-1" });
-    mockUpdateDoc.mockResolvedValueOnce();
     const user = userEvent.setup();
+    const tournamentWithPlayer = {
+      ...baseTournament,
+      participants: [{ id: "existing-1", name: "Existing Player", email: "" }],
+    };
 
     render(
       <TournamentDetail
-        tournament={baseTournament}
+        tournament={tournamentWithPlayer}
         user={adminUser}
         onBack={() => {}}
-        onUpdate={onUpdate}
+        onUpdate={() => {}}
         onDelete={() => {}}
       />
     );
 
     await user.click(screen.getByText("+ Add Participant"));
-    await user.type(screen.getByPlaceholderText("Player name"), "John Doe");
-    await user.type(screen.getByPlaceholderText("player@example.com"), "john@example.com");
+    await user.type(screen.getByPlaceholderText("Player name"), "Existing Player");
     await user.click(screen.getByText("Add"));
 
-    expect(mockUpdateDoc.mock.calls[0][1].participants[0].email).toBe("john@example.com");
+    expect(mockAddDoc).not.toHaveBeenCalled();
+    expect(mockUpdateDoc).not.toHaveBeenCalled();
   });
 
   it("closes modal on Cancel and resets form state", async () => {
@@ -224,6 +234,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
   it("logs event on successful participant addition", async () => {
     mockDoc.mockReturnValue({ id: "t-1" });
     mockUpdateDoc.mockResolvedValueOnce();
+    mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
     render(
@@ -240,6 +251,10 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     await user.type(screen.getByPlaceholderText("Player name"), "Log Test");
     await user.click(screen.getByText("Add"));
 
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      {},
+      { name: "Log Test", provider: "manual", role: "player", createdAt: expect.any(Date) }
+    );
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ action: "add_manual_participant" })
     );
@@ -249,6 +264,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     const onUpdate = vi.fn();
     mockDoc.mockReturnValue({ id: "t-1" });
     mockUpdateDoc.mockResolvedValueOnce();
+    mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
 
     const tournamentWithPlayers = {
       ...baseTournament,
@@ -285,9 +301,8 @@ describe("TournamentDetail - Input Validation", () => {
     matches: [{ id: "r1-m0", round: 1, matchIndex: 0, player1: "A", player2: "B", winner: null, isPlayed: false, prevMatch1: null, prevMatch2: null, winCondition: "ft3" }],
   };
 
-  it("rejects invalid email format when adding participant", async () => {
+  it("does not call updateDoc when participant name is empty", async () => {
     mockDoc.mockReturnValue({ id: "t-1" });
-    mockUpdateDoc.mockResolvedValueOnce();
     const user = userEvent.setup();
 
     render(
@@ -301,16 +316,16 @@ describe("TournamentDetail - Input Validation", () => {
     );
 
     await user.click(screen.getByText("+ Add Participant"));
-    await user.type(screen.getByPlaceholderText("Player name"), "Bad Email");
-    await user.type(screen.getByPlaceholderText("player@example.com"), "not-an-email");
     await user.click(screen.getByText("Add"));
 
+    expect(mockAddDoc).not.toHaveBeenCalled();
     expect(mockUpdateDoc).not.toHaveBeenCalled();
   });
 
-  it("saves with auto-generated email when email is empty", async () => {
+  it("creates user doc with name and provider manual on add", async () => {
     mockDoc.mockReturnValue({ id: "t-1" });
     mockUpdateDoc.mockResolvedValueOnce();
+    mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
     render(
@@ -327,8 +342,10 @@ describe("TournamentDetail - Input Validation", () => {
     await user.type(screen.getByPlaceholderText("Player name"), "John Doe");
     await user.click(screen.getByText("Add"));
 
-    expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-    expect(mockUpdateDoc.mock.calls[0][1].participants[0].email).toBe("john.doe@manual.local");
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      {},
+      { name: "John Doe", provider: "manual", role: "player", createdAt: expect.any(Date) }
+    );
   });
 
   it("rejects negative scores on save score handler", async () => {

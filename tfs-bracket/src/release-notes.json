@@ -30,7 +30,9 @@
       "Invite rework: tournament admins see link-only tab with role locked to Player; super admins see both tabs",
       "Firestore rules: invite creation allowed for tournament admins (isAdmin, not just isSuperAdmin)",
       "URL cleanup: invite query param removed from URL after processing to prevent re-validation",
-      "Add Participant: tabbed modal with Select User (registered users) and Manual Entry modes",
+      "Add Participant: unified picklist for existing users plus name field for new players",
+      "Manual user creation: tournament admins create user docs (provider:manual, role:player) for score eligibility",
+      "Firestore rules: admin-created manual user docs allowed with provider/role validation",
       "Fix resolutions: white screen when navigating between pages",
       "Fix resolutions: page crash when switching to or from Leaderboard",
       "Fix resolutions: error popup about React hooks ordering"

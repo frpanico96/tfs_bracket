@@ -46,7 +46,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
-        && request.auth.uid == userId;
+        && (request.auth.uid == userId
+            || (isAdmin()
+                && request.resource.data.provider == "manual"
+                && request.resource.data.role == "player"));
       allow update: if request.auth != null
         && (request.auth.uid == userId
             || request.resource.data.diff(resource.data).affectedKeys().hasOnly(["score"])

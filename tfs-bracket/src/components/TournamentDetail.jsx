@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef } from "../firebase";
+import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, serverTimestamp } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
@@ -35,9 +35,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [matchWinConditionEdit, setMatchWinConditionEdit] = useState(null);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addParticipantName, setAddParticipantName] = useState("");
-  const [addParticipantEmail, setAddParticipantEmail] = useState("");
   const [registeredUsers, setRegisteredUsers] = useState([]);
-  const [addParticipantMode, setAddParticipantMode] = useState("manual");
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [swapMode, setSwapMode] = useState(false);
   const [swapQuickMode, setSwapQuickMode] = useState(false);
   const [editParticipant, setEditParticipant] = useState(null);
@@ -235,19 +234,16 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin) return;
     const name = addParticipantName.trim();
     if (!name) return;
-    const rawEmail = addParticipantEmail.trim();
-    if (rawEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) return;
-    const id = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    const email = rawEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@manual.local`;
-    const newParticipant = { id, name, email };
+    if (t.participants.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
+    const userDoc = await addDoc(usersRef, { name, provider: "manual", role: "player", createdAt: serverTimestamp() });
+    const newParticipant = { id: userDoc.id, name, email: "" };
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
     });
     onUpdate({ ...t, participants: [...t.participants, newParticipant] });
-    logEvent({ action: "add_manual_participant", details: { tournamentId: t.id, participantName: name, participantId: id } });
+    logEvent({ action: "add_manual_participant", details: { tournamentId: t.id, participantName: name, participantId: userDoc.id } });
     setAddParticipantName("");
-    setAddParticipantEmail("");
     setShowAddParticipant(false);
   };
 
@@ -602,35 +598,48 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
       <BaseModal
         isOpen={showAddParticipant}
-        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); setAddParticipantMode("select"); }}
+        onClose={() => { setShowAddParticipant(false); setAddParticipantName(""); setSelectedUserId(""); }}
         title="Add Participant"
       >
-        <div className="invite-mode-tabs">
-          <button type="button" className={`invite-mode-tab ${addParticipantMode === "select" ? "active" : ""}`} onClick={() => setAddParticipantMode("select")}>
-            Select User
-          </button>
-          <button type="button" className={`invite-mode-tab ${addParticipantMode === "manual" ? "active" : ""}`} onClick={() => setAddParticipantMode("manual")}>
-            Manual Entry
-          </button>
+        <div className="modal-section">
+          <h4>Select existing user</h4>
+          <div className="picklist-row">
+            <select
+              className="picklist"
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+            >
+              <option value="">-- Select a user --</option>
+              {registeredUsers
+                .filter((u) => !t.participants.some((p) => p.id === u.id))
+                .map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}{u.email ? ` (${u.email})` : ""}</option>
+                ))}
+            </select>
+              <button
+              type="button"
+              className="btn-primary"
+              disabled={!selectedUserId}
+              onClick={() => {
+                const user = registeredUsers.find((u) => u.id === selectedUserId);
+                if (user) {
+                  handleSelectUser(user);
+                  setSelectedUserId("");
+                }
+              }}
+            >
+              Add User
+            </button>
+          </div>
+          {registeredUsers.filter((u) => !t.participants.some((p) => p.id === u.id)).length === 0 && (
+            <p className="empty">No users available</p>
+          )}
         </div>
 
-        {addParticipantMode === "select" ? (
-          <div className="modal-options">
-            {registeredUsers
-              .filter((u) => !t.participants.some((p) => p.id === u.id))
-              .map((u) => (
-                <button key={u.id} type="button" className="modal-option" onClick={() => handleSelectUser(u)}>
-                  <div>
-                    <div>{u.name}</div>
-                    <div className="modal-option-desc">{u.email || ""}</div>
-                  </div>
-                </button>
-              ))}
-            {registeredUsers.filter((u) => !t.participants.some((p) => p.id === u.id)).length === 0 && (
-              <p className="empty">No users available</p>
-            )}
-          </div>
-        ) : (
+        <div className="modal-divider"><span>or</span></div>
+
+        <div className="modal-section">
+          <h4>Add new player</h4>
           <form onSubmit={handleAddParticipant}>
             <label className="modal-field">
               <span>Name</span>
@@ -643,17 +652,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 required
               />
             </label>
-            <label className="modal-field">
-              <span>Email (optional)</span>
-              <input
-                type="email"
-                value={addParticipantEmail}
-                onChange={(e) => setAddParticipantEmail(e.target.value)}
-                placeholder="player@example.com"
-              />
-            </label>
+            {t.participants.some((p) => p.name.toLowerCase() === addParticipantName.trim().toLowerCase()) && addParticipantName.trim() && (
+              <p className="field-error">A participant with this name already exists</p>
+            )}
             <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setAddParticipantEmail(""); setAddParticipantMode("select"); }}>
+              <button type="button" className="btn-secondary" onClick={() => { setShowAddParticipant(false); setAddParticipantName(""); setSelectedUserId(""); }}>
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={!addParticipantName.trim()}>
@@ -661,7 +664,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               </button>
             </div>
           </form>
-        )}
+        </div>
       </BaseModal>
 
       <BaseModal

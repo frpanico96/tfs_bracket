@@ -1372,6 +1372,66 @@ body {
   box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
 }
 
+.modal-section {
+  margin-bottom: 16px;
+}
+
+.modal-section h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.modal-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-divider::before,
+.modal-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.field-error {
+  color: #e74c3c;
+  font-size: 13px;
+  margin: -8px 0 8px;
+  font-weight: 400;
+}
+
+.picklist-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.picklist {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.picklist:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+
 .role-badge {
   display: inline-block;
   padding: 3px 10px;

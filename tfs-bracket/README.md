@@ -11,13 +11,14 @@ Built for **Team Fight Series (TFS)** — a community fighting game tournament o
 - **Single & Double Elimination** — Generate brackets, support odd players, grand final reset
 - **Real-time Scoring** — Record match scores with a compact modal; DQ support
 - **Role-based Access** — Super Admin, Tournament Admin, and Player roles
-- **Invite-only UAT** — Secure invite system via Firebase `invites` collection
-- **Participant Management** — Add, edit, or remove participants before the tournament starts
+- **Invite-only UAT** — Secure invite system with email invites and shareable invite links
+- **Participant Management** — Add existing users or create new players via picklist + name field
 - **Custom Point System** — Assign points per finishing rank via "Set Scores" modal
 - **Leaderboard** — Cumulative scores across all completed tournaments, real-time updates
 - **Player Swap** — Admin can swap players between unfilled match slots before recording scores
 - **Rankings Sidebar** — Post-tournament rankings computed from bracket results, visible to all users
 - **Completed Tournament Handling** — Auto-assign scores, sort completed tournaments to bottom
+- **Session Persistence** — Auth and navigation state survive page refresh
 
 ---
 
@@ -120,10 +121,11 @@ The Dev version is resolved in order:
 
 ### Auth flow
 
-1. User signs in with Google (Firebase Auth)
+1. User signs in with Google or Discord (Firebase Auth with OAuth providers)
 2. `useUserRole` hook checks `VITE_ADMINS` env var and `invites` collection
 3. Role is stored in Firestore `users/{uid}.role`
-4. Unauthorized users see an access-denied screen
+4. Unauthorized users see an access-denied screen (RestrictedAccess component)
+5. Registration is gated by `VITE_ALLOW_OPEN_REGISTRATION` env var
 
 ### Bracket engine
 
@@ -142,11 +144,13 @@ All bracket logic lives in `src/utils/bracket.js`:
 - `rankScores[]` — custom points per finishing rank
 - `scoresAssigned` — flag to prevent duplicate score assignment
 
-**User** (`users/{uid}`):
-- `email`, `name`, `role`, `score`
+**User** (`users/{userId}`):
+- `email`, `name`, `role` (admin|tournament_admin|player), `score`, `provider` (google|discord|manual)
+- Manually created players get `provider: "manual"` and `role: "player"`
 
 **Invite** (`invites/{inviteId}`):
 - `email`, `role`, `token`, `used`, `createdBy`
+- Generic multi-use invites support `maxUses` and `expiresAt`
 
 ---
 
@@ -166,13 +170,17 @@ tfs-bracket/
 ├── src/
 │   ├── components/     # React components
 │   ├── hooks/          # Custom hooks (useUserRole)
-│   ├── utils/          # bracket.js, invite.js
+│   ├── utils/          # bracket.js, invite.js, user.js, logger.js
 │   ├── test/           # Test files
+│   ├── release-notes.json
 │   ├── App.jsx         # Main app with routing
 │   ├── App.css         # All styles
 │   └── firebase.js     # Firebase initialization
 ├── firebase.json       # Firebase hosting config
 ├── firestore.rules     # Security rules
+├── firestore.indexes.json
 ├── vite.config.js      # Vite config
-└── .env.example        # Environment variable template
+├── DEV_CONTEXT.md      # Development context
+├── .env.example        # Environment variable template
+└── .github/workflows/  # CI configuration
 ```
