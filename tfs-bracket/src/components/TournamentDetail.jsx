@@ -487,6 +487,21 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               <button className="btn-secondary" onClick={onBack}>
                 ← Back
               </button>
+              {isAdmin && !swapMode && !anyMatchPlayed && !swapQuickMode && (
+                <button className="btn-secondary" onClick={handleEnterSwapMode}>
+                  ⇄ Swap Players
+                </button>
+              )}
+              {isAdmin && (
+                <button className="btn-secondary" onClick={handleResetBracket}>
+                  Reset Bracket
+                </button>
+              )}
+              {isAdmin && (
+                <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
+                  Delete Tournament
+                </button>
+              )}
             </div>
             {swapMode && (
               <div className="swap-banner">
@@ -496,8 +511,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 </button>
               </div>
             )}
-            <div>
-              <BracketView
+            <BracketView
                 matches={t.matches}
                 onMatchClick={handleMatchClick}
                 isAdmin={isAdmin}
@@ -506,7 +520,6 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 canSwap={canSwapPlayers}
                 onSwapPlayers={handleSwapPlayers}
               />
-            </div>
           </>
         )}
       </div>
