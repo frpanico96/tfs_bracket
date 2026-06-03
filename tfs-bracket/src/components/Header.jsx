@@ -1,6 +1,6 @@
 import { useState } from "react";
 import VersionBadges from "./VersionBadges";
-import { getUserName, getUserPhoto, getInitials } from "../utils/user";
+import { getUserName, getUserDisplayName, getUserPhoto, getInitials } from "../utils/user";
 
 function Avatar({ user }) {
   const [broken, setBroken] = useState(false);
@@ -15,8 +15,8 @@ function Avatar({ user }) {
   return <div className="avatar avatar-fallback">{getInitials(name)}</div>;
 }
 
-export default function Header({ user, role, isSuperAdmin, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
-  const displayName = getUserName(user);
+export default function Header({ user, userDoc, role, isSuperAdmin, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
+  const displayName = getUserDisplayName(userDoc) || getUserName(user);
 
   return (
     <header className="header">

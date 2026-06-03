@@ -27,8 +27,22 @@ function buildUserData(user, role, provider, email) {
     name: getUserName(user),
     provider,
     createdAt: serverTimestamp(),
+    display_name: "",
   };
   if (email) data.email = email;
+  if (provider === "discord") {
+    const p = user.providerData?.[0];
+    if (p?.uid) data.external_id = p.uid;
+  }
+  return data;
+}
+
+function buildUpdateData(user, role, provider) {
+  const data = { role, name: getUserName(user), provider };
+  if (provider === "discord") {
+    const p = user.providerData?.[0];
+    if (p?.uid) data.external_id = p.uid;
+  }
   return data;
 }
 
@@ -37,6 +51,7 @@ export default function useUserRole(user, inviteToken) {
   const [loading, setLoading] = useState(true);
   const [inviteResult, setInviteResult] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(null);
+  const [userDoc, setUserDoc] = useState(null);
   const lastValidation = useRef(0);
 
   useEffect(() => {
@@ -69,12 +84,13 @@ export default function useUserRole(user, inviteToken) {
           resolvedRole = invite.role;
           registeredViaInvite = true;
 
-          const userData = buildUserData(user, resolvedRole, provider, email);
-          userData.registeredViaInvite = true;
-
           if (snap.exists()) {
-            await updateDoc(ref, userData);
+            const updateData = buildUpdateData(user, resolvedRole, provider);
+            updateData.registeredViaInvite = true;
+            await updateDoc(ref, updateData);
           } else {
+            const userData = buildUserData(user, resolvedRole, provider, email);
+            userData.registeredViaInvite = true;
             await setDoc(ref, userData);
           }
 
@@ -129,6 +145,21 @@ export default function useUserRole(user, inviteToken) {
         } else {
           if (!cancelled) setIsAuthorized(false);
         }
+
+        if (!cancelled && userDocExists) {
+          const finalSnap = await getDoc(ref);
+          if (finalSnap.exists()) {
+            const data = finalSnap.data();
+            if (!data.external_id && provider === "discord") {
+              const p = user.providerData?.[0];
+              if (p?.uid) {
+                await updateDoc(ref, { external_id: p.uid });
+                data.external_id = p.uid;
+              }
+            }
+            setUserDoc(data);
+          }
+        }
       } catch (err) {
         console.warn("useUserRole: invite processing failed", err);
         if (!cancelled) {
@@ -151,5 +182,6 @@ export default function useUserRole(user, inviteToken) {
     loading,
     inviteResult,
     isAuthorized,
+    userDoc,
   };
 }

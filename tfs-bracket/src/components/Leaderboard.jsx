@@ -42,7 +42,7 @@ export default function Leaderboard() {
             {users.map((u, i) => (
               <tr key={u.id} className={i < 3 ? `leaderboard-top leaderboard-top-${i + 1}` : ""}>
                 <td className="leaderboard-rank">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</td>
-                <td className="leaderboard-name">{u.name || u.email || u.id}</td>
+                <td className="leaderboard-name">{u.display_name || u.name || u.email || u.id}</td>
                 <td className="leaderboard-score">{u.score || 0}</td>
               </tr>
             ))}

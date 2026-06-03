@@ -24,6 +24,7 @@ import InviteModal from "./components/InviteModal";
 import ReleaseNotes from "./components/ReleaseNotes";
 import VersionBadges from "./components/VersionBadges";
 import RestrictedAccess from "./components/RestrictedAccess";
+import SetDisplayName from "./components/SetDisplayName";
 import useUserRole from "./hooks/useUserRole";
 
 function App() {
@@ -38,13 +39,14 @@ function App() {
     return params.get("invite") || null;
   });
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const [localDisplayName, setLocalDisplayName] = useState(null);
   const [pendingTournamentId, setPendingTournamentId] = useState(() => {
     const v = localStorage.getItem("tfs_view");
     if (v === "detail") return localStorage.getItem("tfs_tournamentId") || null;
     return null;
   });
   const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
-  const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized } = useUserRole(user, inviteToken);
+  const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized, userDoc } = useUserRole(user, inviteToken);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -81,7 +83,7 @@ function App() {
   }, [tournaments, pendingTournamentId]);
 
   useEffect(() => {
-    if (loading || view === "leaderboard") return;
+    if (loading || !user || view === "leaderboard") return;
 
     const constraints = isGlobalAdmin
       ? []
@@ -101,7 +103,7 @@ function App() {
       setTournaments(data);
     });
     return () => unsubscribe();
-  }, [loading, isGlobalAdmin, view]);
+  }, [loading, isGlobalAdmin, view, user]);
 
   useEffect(() => {
     if (view === "create" && !isGlobalAdmin) {
@@ -186,10 +188,10 @@ function App() {
     );
   }
 
-  if (loading) {
+  if (loading || (user && isAuthorized === null)) {
     return (
       <div className="app">
-         <Header user={user} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
+         <Header user={user} userDoc={userDoc} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
         <main className="main">
           <p className="empty">Loading...</p>
         </main>
@@ -201,10 +203,22 @@ function App() {
     return <RestrictedAccess user={user} onLogout={handleLogout} />;
   }
 
+  const effectiveDisplayName = localDisplayName || userDoc?.display_name;
+
+  if (userDoc && !effectiveDisplayName) {
+    return (
+      <SetDisplayName
+        user={user}
+        onSaved={(name) => setLocalDisplayName(name)}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <Header
         user={user}
+        userDoc={userDoc}
         role={role}
         isSuperAdmin={isSuperAdmin}
         isGlobalAdmin={isGlobalAdmin}

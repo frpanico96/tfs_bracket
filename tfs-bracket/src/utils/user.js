@@ -4,6 +4,11 @@ export function getUserName(user) {
   return user.displayName || p?.displayName || user.email || "Player";
 }
 
+export function getUserDisplayName(userData) {
+  if (!userData) return null;
+  return userData.display_name || userData.name || null;
+}
+
 export function getUserPhoto(user) {
   if (!user) return null;
   const p = user.providerData?.[0];

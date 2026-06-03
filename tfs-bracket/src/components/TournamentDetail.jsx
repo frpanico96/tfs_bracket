@@ -220,12 +220,13 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const handleSelectUser = async (regUser) => {
     if (!isAdmin) return;
     const ref = doc(db, "tournaments", t.id);
-    const newParticipant = { id: regUser.id, name: regUser.name, email: regUser.email || "" };
+    const effectiveName = regUser.display_name || regUser.name;
+    const newParticipant = { id: regUser.id, name: effectiveName, email: regUser.email || "" };
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
     });
     onUpdate({ ...t, participants: [...t.participants, newParticipant] });
-    logEvent({ action: "add_participant", details: { tournamentId: t.id, participantId: regUser.id, participantName: regUser.name } });
+    logEvent({ action: "add_participant", details: { tournamentId: t.id, participantId: regUser.id, participantName: effectiveName } });
     setShowAddParticipant(false);
   };
 
@@ -486,21 +487,6 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               <button className="btn-secondary" onClick={onBack}>
                 ← Back
               </button>
-              {isAdmin && !swapMode && !anyMatchPlayed && !swapQuickMode && (
-                <button className="btn-secondary" onClick={handleEnterSwapMode}>
-                  ⇄ Swap Players
-                </button>
-              )}
-              {isAdmin && (
-                <button className="btn-secondary" onClick={handleResetBracket}>
-                  Reset Bracket
-                </button>
-              )}
-              {isAdmin && (
-                <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
-                  Delete Tournament
-                </button>
-              )}
             </div>
             {swapMode && (
               <div className="swap-banner">
@@ -510,15 +496,17 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 </button>
               </div>
             )}
-            <BracketView
-              matches={t.matches}
-              onMatchClick={handleMatchClick}
-              isAdmin={isAdmin}
-              bracketType={t.bracketType}
-              onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
-              canSwap={canSwapPlayers}
-              onSwapPlayers={handleSwapPlayers}
-            />
+            <div>
+              <BracketView
+                matches={t.matches}
+                onMatchClick={handleMatchClick}
+                isAdmin={isAdmin}
+                bracketType={t.bracketType}
+                onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
+                canSwap={canSwapPlayers}
+                onSwapPlayers={handleSwapPlayers}
+              />
+            </div>
           </>
         )}
       </div>
@@ -613,7 +601,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               {registeredUsers
                 .filter((u) => !t.participants.some((p) => p.id === u.id))
                 .map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}{u.email ? ` (${u.email})` : ""}</option>
+                  <option key={u.id} value={u.id}>{u.display_name || u.name}{u.email ? ` (${u.email})` : ""}</option>
                 ))}
             </select>
               <button
