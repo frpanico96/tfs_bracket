@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useToast } from "./components/Toast";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   signInWithGoogle,
@@ -25,6 +26,7 @@ import ReleaseNotes from "./components/ReleaseNotes";
 import VersionBadges from "./components/VersionBadges";
 import RestrictedAccess from "./components/RestrictedAccess";
 import SetDisplayName from "./components/SetDisplayName";
+import BaseModal from "./components/BaseModal";
 import useUserRole from "./hooks/useUserRole";
 
 function App() {
@@ -45,8 +47,11 @@ function App() {
     if (v === "detail") return localStorage.getItem("tfs_tournamentId") || null;
     return null;
   });
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [dismissedInvite, setDismissedInvite] = useState(false);
   const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
   const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized, userDoc } = useUserRole(user, inviteToken);
+  const addToast = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -128,16 +133,25 @@ function App() {
         await signInWithGoogle();
       }
     } catch (e) {
-      alert("Login failed: " + e.message);
+      addToast("Login failed: " + e.message, "error");
     }
   };
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmLogout = async () => {
     await logOut();
     setView("list");
     setSelectedTournament(null);
+    setShowLogoutConfirm(false);
     localStorage.removeItem("tfs_view");
     localStorage.removeItem("tfs_tournamentId");
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   const handleDeleteTournament = async (tournamentId) => {
@@ -230,15 +244,16 @@ function App() {
       />
 
       <main className={`main ${view === "detail" ? "main-full" : ""}`}>
-        {inviteResult && (
+        {inviteResult && !dismissedInvite && (
           <div className={`invite-banner invite-${inviteResult.success ? "success" : "error"}`}>
-            {inviteResult.success
+            <span>{inviteResult.success
               ? `Invite accepted! You are now registered as ${inviteResult.role.replace("_", " ")}.`
               : inviteResult.reason === "invalid"
               ? "This invite link is invalid, expired, or has reached its maximum uses."
               : inviteResult.reason === "error"
               ? "Failed to process invite. Check the console or try again."
-              : "This invite was sent to a different email address."}
+              : "This invite was sent to a different email address."}</span>
+            <button className="invite-banner-close" onClick={() => setDismissedInvite(true)} aria-label="Dismiss">×</button>
           </div>
         )}
         <div className="view-container">
@@ -292,6 +307,14 @@ function App() {
         onClose={() => setShowReleaseNotes(false)}
         currentVersion={version}
       />
+
+      <BaseModal isOpen={showLogoutConfirm} onClose={handleCancelLogout} title="Logout">
+        <p>Are you sure you want to sign out?</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={handleCancelLogout}>Cancel</button>
+          <button className="btn-danger" onClick={handleConfirmLogout}>Sign Out</button>
+        </div>
+      </BaseModal>
     </div>
   );
 }
