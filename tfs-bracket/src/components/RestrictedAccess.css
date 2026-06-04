@@ -1,0 +1,78 @@
+.restricted-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 40%, #fd79a8 100%);
+  background-size: 200% 200%;
+  animation: restrictedGradientShift 8s ease infinite;
+  padding: 20px;
+}
+
+@keyframes restrictedGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.restricted-box {
+  background: var(--surface);
+  padding: 48px 40px;
+  border-radius: var(--radius-xl);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  max-width: 400px;
+  width: 100%;
+  animation: restrictedFadeUp 0.5s ease;
+}
+
+@keyframes restrictedFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.restricted-lock {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.restricted-box h2 {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.restricted-box p {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.restricted-logout-btn {
+  margin-top: 24px;
+  background: var(--border-light);
+  color: var(--text);
+  border: none;
+  padding: 10px 22px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.restricted-logout-btn:hover {
+  background: var(--danger);
+  color: white;
+  transform: translateY(-1px);
+}

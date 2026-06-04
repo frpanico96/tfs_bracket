@@ -1,4 +1,4 @@
-import { addDoc, doc, getDocs, updateDoc, query, where, serverTimestamp, invitesRef, db } from "../firebase";
+import { addDoc, doc, getDocs, runTransaction, query, where, serverTimestamp, increment, invitesRef, db } from "../firebase";
 
 export async function createInvite({ email, role, createdBy, createdByName }) {
   const normalized = email.toLowerCase().trim();
@@ -23,25 +23,60 @@ export async function createInvite({ email, role, createdBy, createdByName }) {
   return { id: inviteRef.id, token };
 }
 
+export async function createGenericInvite({ maxUses, expiresAt, createdBy, createdByName }) {
+  const token = crypto.randomUUID();
+  const inviteRef = await addDoc(invitesRef, {
+    token,
+    role: "player",
+    maxUses,
+    usedCount: 0,
+    expiresAt,
+    createdBy,
+    createdByName,
+    createdAt: serverTimestamp(),
+  });
+  return { id: inviteRef.id, token };
+}
+
 export async function getInviteByToken(token) {
   const q = query(invitesRef, where("token", "==", token));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const doc = snap.docs[0];
   const data = doc.data();
+
   if (data.used) return null;
+
+  if (data.maxUses != null && (data.usedCount || 0) >= data.maxUses) return null;
+
+  if (data.expiresAt) {
+    const exp = data.expiresAt.toMillis ? data.expiresAt.toMillis() : data.expiresAt;
+    if (exp < Date.now()) return null;
+  }
+
   return { id: doc.id, ...data };
 }
 
 export async function isEmailInvited(email) {
-  const q = query(invitesRef, where("email", "==", email.toLowerCase().trim()));
+  const q = query(invitesRef, where("email", "==", email.toLowerCase().trim()), where("used", "==", false));
   const snap = await getDocs(q);
   return !snap.empty;
 }
 
 export async function consumeInvite(inviteId) {
   const ref = doc(db, "invites", inviteId);
-  await updateDoc(ref, { used: true });
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.used) throw new Error("Invite already consumed");
+    if (data.maxUses != null && (data.usedCount || 0) >= data.maxUses) throw new Error("Max uses reached");
+    if (data.expiresAt) {
+      const exp = data.expiresAt.toMillis ? data.expiresAt.toMillis() : data.expiresAt;
+      if (exp < Date.now()) throw new Error("Invite expired");
+    }
+    transaction.update(ref, { usedCount: increment(1), used: true });
+  });
 }
 
 export function buildInviteLink(token) {

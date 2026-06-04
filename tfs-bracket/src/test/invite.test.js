@@ -10,6 +10,21 @@ const mockServerTimestamp = vi.fn(() => ({ toDate: () => new Date() }));
 const mockDb = {};
 const mockInvitesRef = {};
 
+const mockIncrement = vi.fn((n) => n);
+
+const mockTransaction = {
+  get: vi.fn(async () => ({
+    exists: () => true,
+    data: () => ({ used: false, usedCount: 0, maxUses: 5 }),
+  })),
+  update: vi.fn(),
+};
+const mockRunTransaction = vi.fn(async (db, callback) => {
+  mockTransaction.get.mockClear();
+  mockTransaction.update.mockClear();
+  await callback(mockTransaction);
+});
+
 vi.mock("../firebase", () => ({
   addDoc: mockAddDoc,
   getDocs: mockGetDocs,
@@ -18,6 +33,8 @@ vi.mock("../firebase", () => ({
   query: mockQuery,
   where: mockWhere,
   serverTimestamp: mockServerTimestamp,
+  increment: mockIncrement,
+  runTransaction: mockRunTransaction,
   db: mockDb,
   invitesRef: mockInvitesRef,
 }));
@@ -211,13 +228,17 @@ describe("getInviteByToken", () => {
 });
 
 describe("consumeInvite", () => {
-  it("updates the invite document to used: true", async () => {
+  it("updates the invite document within a transaction", async () => {
     mockDoc.mockReturnValue({ id: "invite-1", path: "invites/invite-1" });
 
     await consumeInvite("invite-1");
 
     expect(mockDoc).toHaveBeenCalledWith(mockDb, "invites", "invite-1");
-    expect(mockUpdateDoc).toHaveBeenCalledWith({ id: "invite-1", path: "invites/invite-1" }, { used: true });
+    expect(mockRunTransaction).toHaveBeenCalledWith(mockDb, expect.any(Function));
+    expect(mockTransaction.update).toHaveBeenCalledWith(
+      { id: "invite-1", path: "invites/invite-1" },
+      { used: true, usedCount: 1 },
+    );
   });
 });
 
@@ -254,15 +275,16 @@ describe("isEmailInvited", () => {
     vi.clearAllMocks();
   });
 
-  it("returns true when email has a matching invite", async () => {
+  it("returns true when email has a matching unused invite", async () => {
     mockGetDocs.mockResolvedValue({ empty: false, docs: [{ id: "invite-1" }] });
 
     const result = await isEmailInvited("user@gmail.com");
     expect(result).toBe(true);
     expect(mockWhere).toHaveBeenCalledWith("email", "==", "user@gmail.com");
+    expect(mockWhere).toHaveBeenCalledWith("used", "==", false);
   });
 
-  it("returns false when email has no invite", async () => {
+  it("returns false when email has no unused invite", async () => {
     mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
 
     const result = await isEmailInvited("unknown@gmail.com");
@@ -275,5 +297,6 @@ describe("isEmailInvited", () => {
     const result = await isEmailInvited("TestUser@GMAIL.COM");
     expect(result).toBe(true);
     expect(mockWhere).toHaveBeenCalledWith("email", "==", "testuser@gmail.com");
+    expect(mockWhere).toHaveBeenCalledWith("used", "==", false);
   });
 });

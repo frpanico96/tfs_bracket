@@ -114,3 +114,59 @@ describe("BracketView - Double Elimination", () => {
     expect(onWinClick).toHaveBeenCalledWith(expect.objectContaining({ id: "gf-m0" }));
   });
 });
+
+describe("BracketView - Swap Players", () => {
+  it("does not show swap clickable players when canSwap is false", () => {
+    render(
+      <BracketView matches={singleElimMatches} onMatchClick={() => {}} isAdmin={true} bracketType="single" canSwap={false} />
+    );
+    expect(screen.getByText("Alice").className).not.toContain("swap-player");
+  });
+
+  it("renders swap-player class when canSwap is true", () => {
+    render(
+      <BracketView matches={singleElimMatches} onMatchClick={() => {}} isAdmin={true} bracketType="single" canSwap={true} onSwapPlayers={() => {}} />
+    );
+    const alice = screen.getByText("Alice");
+    expect(alice.className).toContain("swap-player");
+  });
+
+  it("calls onSwapPlayers when two players are clicked", async () => {
+    const onSwap = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <BracketView matches={singleElimMatches} onMatchClick={() => {}} isAdmin={true} bracketType="single" canSwap={true} onSwapPlayers={onSwap} />
+    );
+    await user.click(screen.getByText("Alice"));
+    await user.click(screen.getByText("Charlie"));
+    expect(onSwap).toHaveBeenCalledWith("r1-m0", 0, "r1-m1", 0);
+  });
+
+  it("deselects when clicking the same player again", async () => {
+    const onSwap = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <BracketView matches={singleElimMatches} onMatchClick={() => {}} isAdmin={true} bracketType="single" canSwap={true} onSwapPlayers={onSwap} />
+    );
+    await user.click(screen.getByText("Alice"));
+    expect(screen.getByText("Alice").className).toContain("swap-selected");
+    await user.click(screen.getByText("Alice"));
+    expect(screen.getByText("Alice").className).not.toContain("swap-selected");
+    expect(onSwap).not.toHaveBeenCalled();
+  });
+
+  it("does not call onSwapPlayers when clicking TBD player", async () => {
+    const onSwap = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <BracketView matches={singleElimMatches} onMatchClick={() => {}} isAdmin={true} bracketType="single" canSwap={true} onSwapPlayers={onSwap} />
+    );
+    await user.click(screen.getByText("Alice"));
+    const tdbs = screen.getAllByText("TBD");
+    const nonMatchTbd = tdbs.find(t => t.closest(".future"));
+    if (nonMatchTbd) {
+      await user.click(nonMatchTbd);
+    }
+    expect(onSwap).not.toHaveBeenCalled();
+  });
+});
