@@ -19,6 +19,10 @@ Built for **Team Fight Series (TFS)** — a community fighting game tournament o
 - **Rankings Sidebar** — Post-tournament rankings computed from bracket results, visible to all users
 - **Completed Tournament Handling** — Auto-assign scores, sort completed tournaments to bottom
 - **Session Persistence** — Auth and navigation state survive page refresh
+- **Toast Notifications** — Non-blocking auto-dismiss notifications for errors and confirmations
+- **Loading Skeletons** — Shimmer placeholders for tournament list and leaderboard while data loads
+- **Accessible Modals** — All modals support Escape key, focus trap, and ARIA attributes
+- **Async Feedback** — Every write operation shows a spinner with contextual status text
 
 ---
 
@@ -124,8 +128,9 @@ The Dev version is resolved in order:
 1. User signs in with Google or Discord (Firebase Auth with OAuth providers)
 2. `useUserRole` hook checks `VITE_ADMINS` env var and `invites` collection
 3. Role is stored in Firestore `users/{uid}.role`
-4. Unauthorized users see an access-denied screen (RestrictedAccess component)
-5. Registration is gated by `VITE_ALLOW_OPEN_REGISTRATION` env var
+4. First-time login prompts the user to set a display name (SetDisplayName component)
+5. Unauthorized users see an access-denied screen (RestrictedAccess component)
+6. Registration is gated by `VITE_ALLOW_OPEN_REGISTRATION` env var
 
 ### Bracket engine
 
@@ -145,7 +150,7 @@ All bracket logic lives in `src/utils/bracket.js`:
 - `scoresAssigned` — flag to prevent duplicate score assignment
 
 **User** (`users/{userId}`):
-- `email`, `name`, `role` (admin|tournament_admin|player), `score`, `provider` (google|discord|manual)
+- `email`, `name`, `display_name`, `role` (admin|tournament_admin|player), `score`, `provider` (google|discord|manual), `external_id` (Discord snowflake)
 - Manually created players get `provider: "manual"` and `role: "player"`
 
 **Invite** (`invites/{inviteId}`):
