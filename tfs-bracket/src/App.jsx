@@ -34,6 +34,7 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [view, setView] = useState(() => localStorage.getItem("tfs_view") || "list");
   const [tournaments, setTournaments] = useState([]);
+  const [tournamentsLoading, setTournamentsLoading] = useState(true);
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteToken] = useState(() => {
@@ -94,6 +95,7 @@ function App() {
       ? []
       : [where("published", "==", true)];
 
+    let firstSnapshot = true;
     const q = query(tournamentsRef, ...constraints);
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
@@ -106,6 +108,10 @@ function App() {
         return bTime - aTime;
       });
       setTournaments(data);
+      if (firstSnapshot) {
+        firstSnapshot = false;
+        setTournamentsLoading(false);
+      }
     });
     return () => unsubscribe();
   }, [loading, isGlobalAdmin, view, user]);
@@ -260,6 +266,7 @@ function App() {
           {view === "list" && (
             <TournamentList
               tournaments={tournaments}
+              loading={tournamentsLoading}
               user={user}
               isGlobalAdmin={isGlobalAdmin}
               onSelect={(t) => {

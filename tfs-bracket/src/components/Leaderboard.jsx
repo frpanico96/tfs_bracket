@@ -26,7 +26,15 @@ export default function Leaderboard() {
     <div className="leaderboard">
       <h2>Leaderboard</h2>
       {loading ? (
-        <p className="empty">Loading...</p>
+        <div className="leaderboard-skeletons">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="skeleton-row">
+              <div className="skeleton skeleton-rank" />
+              <div className="skeleton skeleton-name" />
+              <div className="skeleton skeleton-score" />
+            </div>
+          ))}
+        </div>
       ) : users.length === 0 ? (
         <p className="empty">No scores recorded yet. Complete a tournament to earn points!</p>
       ) : (

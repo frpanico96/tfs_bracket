@@ -7,7 +7,7 @@ function isComplete(t) {
   return t.matches.every((m) => m.winner != null);
 }
 
-export default function TournamentList({ tournaments, user, isGlobalAdmin, onSelect, onCreate, onDelete }) {
+export default function TournamentList({ tournaments, loading, user, isGlobalAdmin, onSelect, onCreate, onDelete }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const now = new Date();
 
@@ -43,7 +43,16 @@ export default function TournamentList({ tournaments, user, isGlobalAdmin, onSel
           </button>
         )}
       </div>
-      {tournaments.length === 0 ? (
+      {loading ? (
+        <div className="cards">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="card skeleton-card">
+              <div className="skeleton" style={{ height: 18 }} />
+              <div className="skeleton" style={{ height: 14, width: "60%" }} />
+            </div>
+          ))}
+        </div>
+      ) : tournaments.length === 0 ? (
         <p className="empty">{isGlobalAdmin ? "No tournaments yet. Create one!" : "No tournaments yet."}</p>
       ) : (
         <div className="cards">
