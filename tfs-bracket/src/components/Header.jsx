@@ -3,16 +3,18 @@ import VersionBadges from "./VersionBadges";
 import { getUserName, getUserDisplayName, getUserPhoto, getInitials } from "../utils/user";
 
 function Avatar({ user }) {
-  const [broken, setBroken] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const photo = getUserPhoto(user);
   const name = getUserName(user);
-  const showImg = photo && !broken;
 
-  if (showImg) {
-    return <img src={photo} alt="" className="avatar" onError={() => setBroken(true)} />;
-  }
-
-  return <div className="avatar avatar-fallback">{getInitials(name)}</div>;
+  return (
+    <div className="avatar-wrapper">
+      <div className="avatar avatar-fallback">{getInitials(name)}</div>
+      {photo && !imgError && (
+        <img src={photo} alt="" className="avatar avatar-img" onError={() => setImgError(true)} />
+      )}
+    </div>
+  );
 }
 
 export default function Header({ user, userDoc, role, isSuperAdmin, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {

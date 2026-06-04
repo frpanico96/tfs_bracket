@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ToastProvider } from "../components/Toast";
 
 const { mockDoc, mockUpdateDoc, mockAddDoc, logEvent } = vi.hoisted(() => ({
   mockDoc: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock("../firebase", () => ({
   usersRef: {},
   db: {},
 }));
+
+function renderWithToast(ui, options) {
+  return render(ui, { wrapper: ToastProvider, ...options });
+}
 
 vi.mock("../utils/logger", () => ({ logEvent }));
 
@@ -71,7 +76,7 @@ beforeEach(() => {
 
 describe("TournamentDetail - Manual Participant Addition", () => {
   it("shows Add Participant button for admin when tournament hasn't started", () => {
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -84,7 +89,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
   });
 
   it("does not show Add Participant button for non-admin users", () => {
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={otherUser}
@@ -97,7 +102,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
   });
 
   it("does not show Add Participant button when tournament has started", () => {
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={{ ...baseTournament, started: true, matches: [{ id: "r1-m0", round: 1, matchIndex: 0, player1: "A", player2: "B", winner: null, isPlayed: false, prevMatch1: null, prevMatch2: null, winCondition: "ft3" }] }}
         user={adminUser}
@@ -111,7 +116,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
 
   it("opens modal when Add Participant is clicked", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -128,7 +133,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
 
   it("disables Add button when name field is empty", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -149,7 +154,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -183,7 +188,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
       participants: [{ id: "existing-1", name: "Existing Player", email: "" }],
     };
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={tournamentWithPlayer}
         user={adminUser}
@@ -203,7 +208,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
 
   it("closes modal on Cancel and resets form state", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(
+    const { rerender } = renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -237,7 +242,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={{ ...baseTournament, participants: [] }}
         user={adminUser}
@@ -274,7 +279,7 @@ describe("TournamentDetail - Manual Participant Addition", () => {
     };
 
     const user = userEvent.setup();
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={tournamentWithPlayers}
         user={adminUser}
@@ -305,7 +310,7 @@ describe("TournamentDetail - Input Validation", () => {
     mockDoc.mockReturnValue({ id: "t-1" });
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -328,7 +333,7 @@ describe("TournamentDetail - Input Validation", () => {
     mockAddDoc.mockResolvedValueOnce({ id: "manual-user-id" });
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={baseTournament}
         user={adminUser}
@@ -353,7 +358,7 @@ describe("TournamentDetail - Input Validation", () => {
     mockUpdateDoc.mockResolvedValueOnce();
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={startedTournament}
         user={adminUser}
@@ -377,7 +382,7 @@ describe("TournamentDetail - Input Validation", () => {
     mockUpdateDoc.mockResolvedValueOnce();
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={startedTournament}
         user={adminUser}
@@ -401,7 +406,7 @@ describe("TournamentDetail - Input Validation", () => {
     mockUpdateDoc.mockResolvedValueOnce();
     const user = userEvent.setup();
 
-    render(
+    renderWithToast(
       <TournamentDetail
         tournament={startedTournament}
         user={adminUser}

@@ -36,7 +36,7 @@ export default function Leaderboard() {
           ))}
         </div>
       ) : users.length === 0 ? (
-        <p className="empty">No scores recorded yet. Complete a tournament to earn points!</p>
+        <p className="empty"><span aria-hidden="true" className="empty-icon">🏆</span><span>No scores recorded yet. Complete a tournament to earn points!</span></p>
       ) : (
         <table className="leaderboard-table">
           <thead>

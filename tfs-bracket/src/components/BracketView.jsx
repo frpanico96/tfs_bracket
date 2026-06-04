@@ -179,7 +179,7 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
   };
 
   if (!matches || matches.length === 0) {
-    return <p className="empty">No matches yet</p>;
+    return <p className="empty"><span aria-hidden="true" className="empty-icon">🏟️</span><span>No matches yet</span></p>;
   }
 
   if (!isDouble) {

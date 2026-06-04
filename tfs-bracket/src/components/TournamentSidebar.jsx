@@ -55,7 +55,7 @@ export default function TournamentSidebar({ isOpen, onToggle, currentCondition, 
   return (
     <>
       <aside className={`tournament-sidebar ${isOpen ? "open" : "collapsed"}`}>
-        <button className="sidebar-toggle" onClick={onToggle}>
+        <button className="sidebar-toggle" onClick={onToggle} aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}>
           {isOpen ? "→" : "←"}
         </button>
         {isOpen && (

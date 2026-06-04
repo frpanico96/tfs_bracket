@@ -457,7 +457,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             </h3>
             <div className="participants-list-scroll">
             {t.participants.length === 0 ? (
-              <p className="empty">No participants yet</p>
+              <p className="empty"><span aria-hidden="true" className="empty-icon">👥</span><span>No participants yet</span></p>
             ) : (
               <ul className="participants-list">
                 {t.participants.map((p, i) => (

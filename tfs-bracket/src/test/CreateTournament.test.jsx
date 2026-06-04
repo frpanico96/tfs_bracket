@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ToastProvider } from "../components/Toast";
 
 const mockAddDoc = vi.fn();
 vi.mock("../firebase", () => ({
@@ -14,6 +15,10 @@ vi.mock("../utils/logger", () => ({ logEvent }));
 
 const CreateTournament = (await import("../components/CreateTournament")).default;
 
+function renderWithToast(ui, options) {
+  return render(ui, { wrapper: ToastProvider, ...options });
+}
+
 const mockUser = { uid: "user-1", displayName: "Test User" };
 
 describe("CreateTournament", () => {
@@ -23,7 +28,7 @@ describe("CreateTournament", () => {
   });
 
   it("renders all form fields", () => {
-    render(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
     expect(screen.getByText("Tournament Name")).toBeInTheDocument();
     expect(screen.getByText("Max Participants")).toBeInTheDocument();
     expect(screen.getByText("Bracket Type")).toBeInTheDocument();
@@ -32,14 +37,14 @@ describe("CreateTournament", () => {
   });
 
   it("has single elimination selected by default", () => {
-    render(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
     const singleBtn = screen.getByText("Single Elimination");
     expect(singleBtn.classList.contains("selected")).toBe(true);
   });
 
   it("switches bracket type on toggle click", async () => {
     const user = userEvent.setup();
-    render(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
     await user.click(screen.getByText("Double Elimination"));
     const doubleBtn = screen.getByText("Double Elimination");
     expect(doubleBtn.classList.contains("selected")).toBe(true);
@@ -48,7 +53,7 @@ describe("CreateTournament", () => {
   it("calls onCancel when cancel button is clicked", async () => {
     const onCancel = vi.fn();
     const user = userEvent.setup();
-    render(<CreateTournament user={mockUser} onCancel={onCancel} onCreated={() => {}} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={onCancel} onCreated={() => {}} />);
     await user.click(screen.getByText("Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
@@ -56,7 +61,7 @@ describe("CreateTournament", () => {
   it("shows alert when name is empty", async () => {
     const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
     const user = userEvent.setup();
-    render(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={() => {}} />);
     await user.click(screen.getByText("Cancel"));
     expect(alert).not.toHaveBeenCalled();
     alert.mockRestore();
@@ -67,7 +72,7 @@ describe("CreateTournament", () => {
     mockAddDoc.mockResolvedValueOnce({ id: "new-id" });
     const user = userEvent.setup();
 
-    render(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={onCreated} />);
+    renderWithToast(<CreateTournament user={mockUser} onCancel={() => {}} onCreated={onCreated} />);
 
     await user.type(screen.getByPlaceholderText("My Tournament"), "Test Tourney");
     const numberInput = screen.getByLabelText("Max Participants");

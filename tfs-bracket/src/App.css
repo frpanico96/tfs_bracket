@@ -245,6 +245,13 @@ body {
   gap: 10px;
 }
 
+.avatar-wrapper {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
 .avatar {
   width: 34px;
   height: 34px;
@@ -252,6 +259,12 @@ body {
   object-fit: cover;
   background: var(--border-light);
   border: 2px solid var(--border);
+}
+
+.avatar-img {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .avatar.avatar-fallback {
@@ -1409,6 +1422,16 @@ body {
   font-weight: 400;
 }
 
+.field-invalid input,
+.field-invalid select {
+  border-color: #e74c3c;
+}
+
+.field-invalid input:focus,
+.field-invalid select:focus {
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.15);
+}
+
 .picklist-row {
   display: flex;
   gap: 10px;
@@ -2426,6 +2449,18 @@ body {
 @keyframes cardEnter {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.empty-icon {
+  font-size: 28px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {

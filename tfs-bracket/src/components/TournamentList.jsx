@@ -53,7 +53,7 @@ export default function TournamentList({ tournaments, loading, user, isGlobalAdm
           ))}
         </div>
       ) : tournaments.length === 0 ? (
-        <p className="empty">{isGlobalAdmin ? "No tournaments yet. Create one!" : "No tournaments yet."}</p>
+        <p className="empty"><span aria-hidden="true" className="empty-icon">🏟️</span><span>{isGlobalAdmin ? "No tournaments yet. Create one!" : "No tournaments yet."}</span></p>
       ) : (
         <div className="cards">
           {sorted.map((t) => {
