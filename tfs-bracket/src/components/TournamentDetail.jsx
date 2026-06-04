@@ -7,7 +7,7 @@ import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
 import BaseModal from "./BaseModal";
-import { useToast } from "./Toast";
+import { useToast } from "../hooks/useToast";
 
 const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
 
@@ -113,7 +113,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       onUpdate({ ...t, participants: [...t.participants, newParticipant] });
       logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
       setShowJoinConfirm(false);
-    } catch (e) {
+    } catch {
       addToast("Failed to join tournament", "error");
     } finally {
       setJoining(false);
@@ -132,7 +132,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       await updateDoc(ref, { published: true });
       onUpdate({ ...t, published: true });
       logEvent({ action: "publish_tournament", details: { tournamentId: t.id, adminId: user.uid } });
-    } catch (e) {
+    } catch {
       addToast("Failed to publish tournament", "error");
     } finally {
       setPublishing(false);
@@ -150,7 +150,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       await updateDoc(ref, { matches, started: true });
       onUpdate({ ...t, matches, started: true });
       logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
-    } catch (e) {
+    } catch {
       addToast("Failed to start tournament", "error");
     } finally {
       setStarting(false);

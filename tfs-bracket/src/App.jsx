@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useToast } from "./components/Toast";
+import { useToast } from "./hooks/useToast";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   signInWithGoogle,
@@ -74,17 +74,20 @@ function App() {
 
   useEffect(() => {
     if (pendingTournamentId && tournaments.length > 0) {
-      const match = tournaments.find((t) => t.id === pendingTournamentId);
-      if (match) {
-        setSelectedTournament(match);
-        setPendingTournamentId(null);
-      } else {
-        setView("list");
-        setSelectedTournament(null);
-        setPendingTournamentId(null);
-        localStorage.removeItem("tfs_view");
-        localStorage.removeItem("tfs_tournamentId");
-      }
+      const timer = setTimeout(() => {
+        const match = tournaments.find((t) => t.id === pendingTournamentId);
+        if (match) {
+          setSelectedTournament(match);
+          setPendingTournamentId(null);
+        } else {
+          setView("list");
+          setSelectedTournament(null);
+          setPendingTournamentId(null);
+          localStorage.removeItem("tfs_view");
+          localStorage.removeItem("tfs_tournamentId");
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [tournaments, pendingTournamentId]);
 
@@ -118,7 +121,8 @@ function App() {
 
   useEffect(() => {
     if (view === "create" && !isGlobalAdmin) {
-      setView("list");
+      const timer = setTimeout(() => setView("list"), 0);
+      return () => clearTimeout(timer);
     }
   }, [view, isGlobalAdmin]);
 
@@ -220,7 +224,7 @@ function App() {
   }
 
   if (isAuthorized === false) {
-    return <RestrictedAccess user={user} onLogout={handleLogout} />;
+    return <RestrictedAccess onLogout={handleLogout} />;
   }
 
   const effectiveDisplayName = localDisplayName || userDoc?.display_name;
@@ -240,7 +244,6 @@ function App() {
         user={user}
         userDoc={userDoc}
         role={role}
-        isSuperAdmin={isSuperAdmin}
         isGlobalAdmin={isGlobalAdmin}
         onLogout={handleLogout}
         onLogoClick={() => setView("list")}

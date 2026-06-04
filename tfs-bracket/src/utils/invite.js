@@ -1,4 +1,4 @@
-import { addDoc, doc, getDocs, updateDoc, runTransaction, query, where, serverTimestamp, increment, invitesRef, db } from "../firebase";
+import { addDoc, doc, getDocs, runTransaction, query, where, serverTimestamp, increment, invitesRef, db } from "../firebase";
 
 export async function createInvite({ email, role, createdBy, createdByName }) {
   const normalized = email.toLowerCase().trim();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db, usersRef, query, where, onSnapshot } from "../firebase";
+import { usersRef, query, where, onSnapshot } from "../firebase";
 
 export default function Leaderboard() {
   const [users, setUsers] = useState([]);

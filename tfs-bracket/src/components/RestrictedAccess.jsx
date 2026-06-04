@@ -1,6 +1,6 @@
 import "./RestrictedAccess.css";
 
-export default function RestrictedAccess({ user, onLogout }) {
+export default function RestrictedAccess({ onLogout }) {
   return (
     <div className="restricted-container">
       <div className="restricted-box">

@@ -17,7 +17,7 @@ function Avatar({ user }) {
   );
 }
 
-export default function Header({ user, userDoc, role, isSuperAdmin, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
+export default function Header({ user, userDoc, role, isGlobalAdmin, onLogout, onLogoClick, onInvite, onNavigate, onVersionClick }) {
   const displayName = getUserDisplayName(userDoc) || getUserName(user);
 
   return (

@@ -27,7 +27,7 @@ export default function SetDisplayName({ user, onSaved }) {
     try {
       await updateDoc(doc(db, "users", user.uid), { display_name: trimmed });
       onSaved(trimmed);
-    } catch (e) {
+    } catch {
       setError("Failed to save. Try again.");
       setSaving(false);
     }

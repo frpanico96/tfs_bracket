@@ -13,7 +13,7 @@ const mockInvitesRef = {};
 const mockIncrement = vi.fn((n) => n);
 
 const mockTransaction = {
-  get: vi.fn(async (ref) => ({
+  get: vi.fn(async () => ({
     exists: () => true,
     data: () => ({ used: false, usedCount: 0, maxUses: 5 }),
   })),

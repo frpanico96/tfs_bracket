@@ -6,7 +6,7 @@ import {
 } from "../firebase";
 import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
-import { useToast } from "./Toast";
+import { useToast } from "../hooks/useToast";
 
 export default function CreateTournament({ user, onCancel, onCreated }) {
   const [name, setName] = useState("");

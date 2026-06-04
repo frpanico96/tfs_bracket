@@ -55,11 +55,7 @@ export default function useUserRole(user, inviteToken) {
   const lastValidation = useRef(0);
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      setIsAuthorized(null);
-      return;
-    }
+    if (!user) return;
 
     let cancelled = false;
 
@@ -179,9 +175,9 @@ export default function useUserRole(user, inviteToken) {
     role,
     isGlobalAdmin: role === "admin" || role === "tournament_admin",
     isSuperAdmin: role === "admin",
-    loading,
+    loading: user ? loading : false,
     inviteResult,
-    isAuthorized,
+    isAuthorized: user ? isAuthorized : null,
     userDoc,
   };
 }
