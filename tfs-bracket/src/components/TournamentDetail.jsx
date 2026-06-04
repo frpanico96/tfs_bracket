@@ -7,6 +7,7 @@ import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
 import BaseModal from "./BaseModal";
+import { useToast } from "./Toast";
 
 const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
 
@@ -32,6 +33,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(null);
   const [matchWinConditionEdit, setMatchWinConditionEdit] = useState(null);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addParticipantName, setAddParticipantName] = useState("");
@@ -45,6 +48,10 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [showRankScores, setShowRankScores] = useState(false);
   const [rankScoreValues, setRankScoreValues] = useState([]);
   const [showJoinConfirm, setShowJoinConfirm] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const addToast = useToast();
 
   const rawRankings = useMemo(
     () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
@@ -95,15 +102,22 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleConfirmJoin = async () => {
-    const ref = doc(db, "tournaments", t.id);
-    const name = getUserName(user);
-    const newParticipant = { id: user.uid, name, email: user.email };
-    await updateDoc(ref, {
-      participants: [...t.participants, newParticipant],
-    });
-    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
-    logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
-    setShowJoinConfirm(false);
+    setJoining(true);
+    try {
+      const ref = doc(db, "tournaments", t.id);
+      const name = getUserName(user);
+      const newParticipant = { id: user.uid, name, email: user.email };
+      await updateDoc(ref, {
+        participants: [...t.participants, newParticipant],
+      });
+      onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+      logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
+      setShowJoinConfirm(false);
+    } catch (e) {
+      addToast("Failed to join tournament", "error");
+    } finally {
+      setJoining(false);
+    }
   };
 
   const handleCancelJoin = () => {
@@ -112,21 +126,35 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handlePublish = async () => {
     if (!isAdmin) return;
-    const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { published: true });
-    onUpdate({ ...t, published: true });
-    logEvent({ action: "publish_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+    setPublishing(true);
+    try {
+      const ref = doc(db, "tournaments", t.id);
+      await updateDoc(ref, { published: true });
+      onUpdate({ ...t, published: true });
+      logEvent({ action: "publish_tournament", details: { tournamentId: t.id, adminId: user.uid } });
+    } catch (e) {
+      addToast("Failed to publish tournament", "error");
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const handleStartTournament = async () => {
     if (!isAdmin) return;
-    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
-    const wc = t.defaultWinCondition || "ft3";
-    const matches = bracketGen(t.participants, t.maxParticipants, wc);
-    const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { matches, started: true });
-    onUpdate({ ...t, matches, started: true });
-    logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
+    setStarting(true);
+    try {
+      const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+      const wc = t.defaultWinCondition || "ft3";
+      const matches = bracketGen(t.participants, t.maxParticipants, wc);
+      const ref = doc(db, "tournaments", t.id);
+      await updateDoc(ref, { matches, started: true });
+      onUpdate({ ...t, matches, started: true });
+      logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
+    } catch (e) {
+      addToast("Failed to start tournament", "error");
+    } finally {
+      setStarting(false);
+    }
   };
 
   const handleMatchClick = (match) => {
@@ -274,9 +302,12 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     logEvent({ action: "add_fake_users", details: { tournamentId: t.id, count: toAdd.length } });
   };
 
-  const handleResetBracket = async () => {
+  const handleResetBracket = () => {
     if (!isAdmin) return;
-    if (!confirm("Are you sure you want to reset the bracket? All matches will be cleared.")) return;
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = async () => {
     const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
     const wc = t.defaultWinCondition || "ft3";
     const freshMatches = bracketGen(t.participants, t.maxParticipants, wc);
@@ -284,6 +315,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     await updateDoc(ref, { matches: freshMatches });
     onUpdate({ ...t, matches: freshMatches });
     logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
+    setShowResetConfirm(false);
   };
 
   const anyMatchPlayed = t.matches?.length > 0 && t.matches.some((m) => m.isPlayed);
@@ -333,14 +365,19 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     setEditParticipantEmail("");
   };
 
-  const handleRemoveParticipant = async (participant) => {
+  const handleRemoveParticipant = (participant) => {
     if (!isAdmin) return;
-    if (!confirm(`Remove "${participant.name}" from the tournament?`)) return;
-    const updatedParticipants = t.participants.filter((p) => p.id !== participant.id);
+    setShowRemoveConfirm(participant);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!showRemoveConfirm) return;
+    const updatedParticipants = t.participants.filter((p) => p.id !== showRemoveConfirm.id);
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { participants: updatedParticipants });
     onUpdate({ ...t, participants: updatedParticipants });
-    logEvent({ action: "remove_participant", details: { tournamentId: t.id, participantId: participant.id, participantName: participant.name } });
+    logEvent({ action: "remove_participant", details: { tournamentId: t.id, participantId: showRemoveConfirm.id, participantName: showRemoveConfirm.name } });
+    setShowRemoveConfirm(null);
   };
 
   const handleOpenRankScores = () => {
@@ -381,8 +418,9 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         <div className="detail-header">
           <h2>{t.name}</h2>
           {isAdmin && !t.published && (
-            <button className="btn-primary" onClick={handlePublish}>
-              Publish
+            <button className="btn-primary" onClick={handlePublish} disabled={publishing}>
+              {publishing && <span className="saving-throbber" />}
+              {publishing ? "Publishing..." : "Publish"}
             </button>
           )}
         </div>
@@ -472,8 +510,9 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 </button>
               )}
               {isAdmin && t.published && (
-                <button className="btn-primary" onClick={handleStartTournament} disabled={t.participants.length < 2}>
-                  Start Tournament ({t.participants.length}/{t.maxParticipants})
+                <button className="btn-primary" onClick={handleStartTournament} disabled={starting || t.participants.length < 2}>
+                  {starting && <span className="saving-throbber" />}
+                  {starting ? "Starting..." : `Start Tournament (${t.participants.length}/${t.maxParticipants})`}
                 </button>
               )}
               </div>
@@ -524,27 +563,29 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         )}
       </div>
 
-      {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Delete Tournament</h3>
-              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p>Are you sure you want to delete "{t.name}"? This action cannot be undone.</p>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>
-                  Cancel
-                </button>
-                <button className="btn-danger" onClick={handleDelete}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
+      <BaseModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Tournament">
+        <p>Are you sure you want to delete "{t.name}"? This action cannot be undone.</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+          <button className="btn-danger" onClick={handleDelete}>Delete</button>
         </div>
-      )}
+      </BaseModal>
+
+      <BaseModal isOpen={showResetConfirm} onClose={() => setShowResetConfirm(false)} title="Reset Bracket">
+        <p>Are you sure you want to reset the bracket? All matches will be cleared.</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={() => setShowResetConfirm(false)}>Cancel</button>
+          <button className="btn-danger" onClick={handleConfirmReset}>Reset</button>
+        </div>
+      </BaseModal>
+
+      <BaseModal isOpen={!!showRemoveConfirm} onClose={() => setShowRemoveConfirm(null)} title="Remove Participant">
+        <p>Remove "{showRemoveConfirm?.name}" from the tournament?</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={() => setShowRemoveConfirm(null)}>Cancel</button>
+          <button className="btn-danger" onClick={handleConfirmRemove}>Remove</button>
+        </div>
+      </BaseModal>
 
       <TournamentSidebar
         isOpen={sidebarOpen}
@@ -712,11 +753,12 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       >
         <p>Are you sure you want to join "{t.name}"?</p>
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={handleCancelJoin}>
+          <button className="btn-secondary" onClick={handleCancelJoin} disabled={joining}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={handleConfirmJoin}>
-            Confirm
+          <button className="btn-primary" onClick={handleConfirmJoin} disabled={joining}>
+            {joining && <span className="saving-throbber" />}
+            {joining ? "Joining..." : "Confirm"}
           </button>
         </div>
       </BaseModal>
