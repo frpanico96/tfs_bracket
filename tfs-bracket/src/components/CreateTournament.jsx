@@ -5,6 +5,8 @@ import {
   serverTimestamp,
 } from "../firebase";
 import { logEvent } from "../utils/logger";
+import { getUserName } from "../utils/user";
+import { useToast } from "./Toast";
 
 export default function CreateTournament({ user, onCancel, onCreated }) {
   const [name, setName] = useState("");
@@ -12,35 +14,39 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
   const [regStart, setRegStart] = useState("");
   const [regEnd, setRegEnd] = useState("");
   const [bracketType, setBracketType] = useState("single");
+  const [creating, setCreating] = useState(false);
+  const [errors, setErrors] = useState({});
+  const addToast = useToast();
+
+  const validate = () => {
+    const errs = {};
+    if (!name.trim()) errs.name = "Tournament name is required";
+    else if (name.length > 100) errs.name = "Name must be 100 characters or less";
+    const maxP = parseInt(maxParticipants);
+    if (isNaN(maxP) || maxP < 2 || maxP > 64) errs.maxParticipants = "Must be between 2 and 64";
+    if (!regStart) errs.regStart = "Registration start is required";
+    if (!regEnd) errs.regEnd = "Registration end is required";
+    if (regStart && regEnd && new Date(regEnd) <= new Date(regStart)) {
+      errs.regEnd = "End must be after start";
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !regStart || !regEnd) {
-      alert("Please fill all fields");
-      return;
-    }
-    if (name.length > 100) {
-      alert("Tournament name must be 100 characters or less");
-      return;
-    }
-    const maxP = parseInt(maxParticipants);
-    if (isNaN(maxP) || maxP < 2 || maxP > 64) {
-      alert("Max participants must be between 2 and 64");
-      return;
-    }
-    if (new Date(regEnd) <= new Date(regStart)) {
-      alert("Registration end must be after registration start");
-      return;
-    }
+    if (!validate()) return;
+    setCreating(true);
     try {
+      const maxP = parseInt(maxParticipants);
       const docRef = await addDoc(tournamentsRef, {
-        name,
+        name: name.trim(),
         maxParticipants: maxP,
         regStart: new Date(regStart),
         regEnd: new Date(regEnd),
         createdAt: serverTimestamp(),
         adminId: user.uid,
-        adminName: user.displayName,
+        adminName: getUserName(user),
         published: false,
         started: false,
         bracketType,
@@ -49,12 +55,12 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
       });
       onCreated({
         id: docRef.id,
-        name,
+        name: name.trim(),
         maxParticipants: maxP,
         regStart: new Date(regStart),
         regEnd: new Date(regEnd),
         adminId: user.uid,
-        adminName: user.displayName,
+        adminName: getUserName(user),
         published: false,
         started: false,
         bracketType,
@@ -65,25 +71,28 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
     } catch (error) {
       console.error("Create failed:", error);
       logEvent({ level: "error", action: "create_tournament_error", details: { error: error.message, adminId: user.uid } });
-      alert("Failed to create tournament: " + error.message);
+      addToast("Failed to create tournament: " + error.message, "error");
+    } finally {
+      setCreating(false);
     }
   };
 
   return (
     <div className="create-tournament">
       <h2>Create Tournament</h2>
-      <form onSubmit={handleSubmit}>
-        <label>
+      <form onSubmit={handleSubmit} noValidate>
+        <label className={errors.name ? "field-invalid" : ""}>
           Tournament Name
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((prev) => ({ ...prev, name: "" })); }}
             placeholder="My Tournament"
             required
           />
+          {errors.name && <span className="field-error">{errors.name}</span>}
         </label>
-        <label>
+        <label className={errors.maxParticipants ? "field-invalid" : ""}>
           Max Participants
           <input
             type="number"
@@ -92,6 +101,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
             value={maxParticipants}
             onChange={(e) => setMaxParticipants(parseInt(e.target.value))}
           />
+          {errors.maxParticipants && <span className="field-error">{errors.maxParticipants}</span>}
         </label>
         <label>
           Bracket Type
@@ -112,30 +122,33 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
             </button>
           </div>
         </label>
-        <label>
+        <label className={errors.regStart ? "field-invalid" : ""}>
           Registration Start
           <input
             type="datetime-local"
             value={regStart}
-            onChange={(e) => setRegStart(e.target.value)}
+            onChange={(e) => { setRegStart(e.target.value); if (errors.regStart) setErrors((prev) => ({ ...prev, regStart: "" })); }}
             required
           />
+          {errors.regStart && <span className="field-error">{errors.regStart}</span>}
         </label>
-        <label>
+        <label className={errors.regEnd ? "field-invalid" : ""}>
           Registration End
           <input
             type="datetime-local"
             value={regEnd}
-            onChange={(e) => setRegEnd(e.target.value)}
+            onChange={(e) => { setRegEnd(e.target.value); if (errors.regEnd) setErrors((prev) => ({ ...prev, regEnd: "" })); }}
             required
           />
+          {errors.regEnd && <span className="field-error">{errors.regEnd}</span>}
         </label>
         <div className="buttons">
-          <button type="button" className="btn-secondary" onClick={onCancel}>
+          <button type="button" className="btn-secondary" onClick={onCancel} disabled={creating}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary">
-            Create
+          <button type="submit" className="btn-primary" disabled={creating}>
+            {creating && <span className="saving-throbber" />}
+            {creating ? "Creating..." : "Create"}
           </button>
         </div>
       </form>

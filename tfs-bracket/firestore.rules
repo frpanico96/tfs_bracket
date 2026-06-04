@@ -1,27 +1,76 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "tournament_admin"];
+    }
+
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isValidTournament() {
+      return request.resource.data.name is string
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.maxParticipants >= 2
+        && request.resource.data.maxParticipants <= 64
+        && request.resource.data.bracketType in ["single", "double"]
+        && request.resource.data.adminId == request.auth.uid;
+    }
+
+    function canJoinTournament() {
+      return resource.data.published == true
+        && request.time >= resource.data.regStart
+        && request.time < resource.data.regEnd
+        && resource.data.participants.size() < resource.data.maxParticipants
+        && request.resource.data.participants.size() == resource.data.participants.size() + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participants"]);
+    }
+
     match /tournaments/{tournamentId} {
+      allow read: if request.auth != null
+        && (resource.data.published == true
+            || resource.data.adminId == request.auth.uid
+            || isAdmin());
+      allow create: if request.auth != null
+        && isAdmin()
+        && isValidTournament();
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.adminId
+            || canJoinTournament());
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.adminId;
+    }
+
+    match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.adminId == request.auth.uid;
+        && (request.auth.uid == userId
+            || (isAdmin()
+                && request.resource.data.provider == "manual"
+                && request.resource.data.role == "player"));
       allow update: if request.auth != null
-                    && request.auth.uid == resource.data.adminId;
+        && (request.auth.uid == userId
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(["score"])
+            || request.resource.data.diff(resource.data).affectedKeys().size() == 0);
       allow delete: if request.auth != null
-                    && request.auth.uid == resource.data.adminId;
+        && request.auth.uid == userId;
     }
-    match /users/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
+
     match /invites/{inviteId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && isAdmin();
       allow update: if request.auth != null;
+      allow delete: if false;
     }
+
     match /logs/{logId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow read: if false;
+      allow delete: if false;
+      allow update: if false;
     }
   }
 }

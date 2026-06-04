@@ -679,3 +679,279 @@ export function resetBracket(participants, max, type = 'single', winCondition) {
 export function isDoubleBracket(matches) {
   return matches && matches.length > 0 && matches[0].bracket === 'winners';
 }
+
+export function swapPlayers(matches, matchId1, slot1, matchId2, slot2) {
+  const updated = matches.map(m => ({ ...m }));
+  const m1 = updated.find(m => m.id === matchId1);
+  const m2 = updated.find(m => m.id === matchId2);
+  if (!m1 || !m2) return matches;
+
+  const playerKey1 = slot1 === 0 ? "player1" : "player2";
+  const playerKey2 = slot2 === 0 ? "player1" : "player2";
+
+  const p1 = m1[playerKey1];
+  const p2 = m2[playerKey2];
+
+  if (!p1 || !p2 || p1 === "TBD" || p2 === "TBD" || p1 === "BYE" || p2 === "BYE") return matches;
+
+  m1[playerKey1] = p2;
+  m2[playerKey2] = p1;
+
+  return updated;
+}
+
+export function getMatchRoundName(match, allMatches, bracketType) {
+  if (!allMatches || allMatches.length === 0) {
+    return `Round ${match.round}`;
+  }
+
+  if (bracketType === 'double') {
+    if (match.bracket === 'grandFinal') {
+      return match.id === 'gf-m1' ? 'Grand Final Reset' : 'Grand Final';
+    }
+    const sameBracket = allMatches.filter(m => m.bracket === match.bracket);
+    const rounds = [...new Set(sameBracket.map(m => m.round))].sort((a, b) => a - b);
+    const roundIndex = rounds.indexOf(match.round);
+    const totalRounds = rounds.length;
+    const count = sameBracket.filter(m => m.round === match.round).length;
+
+    if (match.bracket === 'winners') {
+      if (roundIndex === 0 && count < 4) return "Preliminary";
+      if (roundIndex === totalRounds - 1) return "Winners Final";
+      if (count === 2) return "Semifinals";
+      if (count === 4) return "Quarterfinals";
+      if (count === 8) return "Round of 16";
+      return `WB Round ${match.round}`;
+    } else {
+      if (roundIndex === totalRounds - 1) return "Losers Final";
+      return `Losers Round ${match.round}`;
+    }
+  }
+
+  const rounds = [...new Set(allMatches.map(m => m.round))].sort((a, b) => a - b);
+  const roundIndex = rounds.indexOf(match.round);
+  const totalRounds = rounds.length;
+  const isLastRound = roundIndex === totalRounds - 1;
+  const isFirstRound = roundIndex === 0;
+  const hasPrelims = rounds.length > 1 &&
+    allMatches.filter(m => m.round === rounds[0]).length <
+    allMatches.filter(m => m.round === rounds[1]).length;
+  const count = allMatches.filter(m => m.round === match.round).length;
+
+  if (isFirstRound && hasPrelims) return "Preliminary";
+  if (isLastRound) return "Finals";
+  if (count === 2) return "Semifinals";
+  if (count === 4) return "Quarterfinals";
+  if (count === 8) return "Round of 16";
+  return `Round ${match.round}`;
+}
+
+function getOrdinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+function realPlayer(p) {
+  return p && p !== "TBD" && p !== "BYE";
+}
+
+function addRankingEntry(result, rank, label, players, points) {
+  if (!players || players.length === 0) return;
+  const endRank = rank + players.length - 1;
+  result.push({
+    rank,
+    displayRank: players.length === 1 ? `${rank}${getOrdinal(rank)}` : `${rank}${getOrdinal(rank)}-${endRank}${getOrdinal(endRank)}`,
+    label,
+    players,
+    points,
+  });
+}
+
+function computeSingleElimRankings(allMatches, rankScores) {
+  const rounds = groupByRound(allMatches);
+  if (rounds.length === 0) return [];
+
+  const finalRound = rounds[rounds.length - 1];
+  const finalMatch = finalRound?.[0];
+  if (!finalMatch || finalMatch.winner == null) return [];
+
+  const champ = finalMatch.winner === 0 ? finalMatch.player1 : finalMatch.player2;
+  const runnerUp = finalMatch.winner === 0 ? finalMatch.player2 : finalMatch.player1;
+  const result = [];
+
+  const pts = (rank) => (rankScores && rankScores[rank - 1] != null ? rankScores[rank - 1] : 0);
+
+  if (realPlayer(champ)) addRankingEntry(result, 1, "Champion", [champ], pts(1));
+  if (realPlayer(runnerUp)) addRankingEntry(result, 2, "Runner-up", [runnerUp], pts(2));
+
+  const rankMap = [
+    { roundFromEnd: 2, rank: 3, label: "Semifinalists", pts: () => pts(3) },
+    { roundFromEnd: 3, rank: 5, label: "Quarterfinalists", pts: () => pts(5) },
+    { roundFromEnd: 4, rank: 9, label: "Round of 16", pts: () => pts(9) },
+    { roundFromEnd: 5, rank: 17, label: "Round of 32", pts: () => pts(17) },
+  ];
+
+  for (const tmpl of rankMap) {
+    const idx = rounds.length - tmpl.roundFromEnd;
+    if (idx < 0) break;
+    const losers = [];
+    for (const m of rounds[idx]) {
+      if (m.winner == null || m.player1 === "BYE" || m.player2 === "BYE") continue;
+      const loser = m.winner === 0 ? m.player2 : m.player1;
+      if (realPlayer(loser)) losers.push(loser);
+    }
+    if (losers.length > 0) {
+      addRankingEntry(result, tmpl.rank, losers.length === 2 && tmpl.label === "Semifinalists" ? "Semifinalists" : tmpl.label, losers, tmpl.pts());
+    }
+  }
+
+  return result;
+}
+
+function computeDoubleElimRankings(allMatches, rankScores) {
+  const gfM0 = allMatches.find(m => m.id === 'gf-m0');
+  const gfM1 = allMatches.find(m => m.id === 'gf-m1');
+
+  const gfPopulated = gfM1 && gfM1.player1 && gfM1.player1 !== "TBD" && gfM1.player2 && gfM1.player2 !== "TBD";
+  if (gfPopulated && gfM1.winner == null) return [];
+
+  let lastGf;
+  if (gfM1 && gfM1.winner != null) lastGf = gfM1;
+  else if (gfM0 && gfM0.winner != null) lastGf = gfM0;
+  else return [];
+
+  const champ = lastGf.winner === 0 ? lastGf.player1 : lastGf.player2;
+  const runnerUp = lastGf.winner === 0 ? lastGf.player2 : lastGf.player1;
+  const result = [];
+
+  const pts = (rank) => (rankScores && rankScores[rank - 1] != null ? rankScores[rank - 1] : 0);
+
+  if (realPlayer(champ)) addRankingEntry(result, 1, "Champion", [champ], pts(1));
+  if (realPlayer(runnerUp)) addRankingEntry(result, 2, "Runner-up", [runnerUp], pts(2));
+
+  const wbMatches = allMatches.filter(m => m.bracket === 'winners');
+  const lbMatches = allMatches.filter(m => m.bracket === 'losers');
+  const wbRounds = groupByRound(wbMatches);
+  const lbRounds = groupByRound(lbMatches);
+
+  const wbFinal = wbRounds[wbRounds.length - 1]?.[0];
+  const lbFinal = lbRounds[lbRounds.length - 1]?.[0];
+
+  let wbFinalLoser = null;
+  if (wbFinal && wbFinal.winner != null) {
+    wbFinalLoser = wbFinal.winner === 0 ? wbFinal.player2 : wbFinal.player1;
+    if (!realPlayer(wbFinalLoser)) wbFinalLoser = null;
+  }
+
+  const wbFinalLoserInGf = wbFinalLoser && gfM0 &&
+    (gfM0.player1 === wbFinalLoser || gfM0.player2 === wbFinalLoser);
+
+  let third = null;
+  if (wbFinalLoser && !wbFinalLoserInGf) {
+    third = wbFinalLoser;
+  } else if (lbFinal && lbFinal.winner != null) {
+    third = lbFinal.winner === 0 ? lbFinal.player2 : lbFinal.player1;
+    if (!realPlayer(third)) third = null;
+  }
+
+  if (third && third !== champ && third !== runnerUp) {
+    addRankingEntry(result, 3, "Third Place", [third], pts(3));
+  }
+
+  let fourth = null;
+  if (third === wbFinalLoser) {
+    if (lbFinal && lbFinal.winner != null) {
+      fourth = lbFinal.winner === 0 ? lbFinal.player2 : lbFinal.player1;
+      if (!realPlayer(fourth)) fourth = null;
+    }
+  } else {
+    fourth = wbFinalLoser;
+  }
+
+  if (fourth && fourth !== champ && fourth !== runnerUp && fourth !== third) {
+    addRankingEntry(result, 4, "Fourth Place", [fourth], pts(4));
+  }
+
+  const ranked = new Set([champ, runnerUp, third, fourth].filter(Boolean));
+
+  const allPlayers = new Set();
+  for (const m of allMatches) {
+    for (const p of [m.player1, m.player2]) {
+      if (realPlayer(p)) allPlayers.add(p);
+    }
+  }
+
+  const remaining = [];
+  for (const player of allPlayers) {
+    if (ranked.has(player)) continue;
+    let lastLoss = null;
+    for (const m of allMatches) {
+      if (m.winner == null) continue;
+      const loser = m.winner === 0 ? m.player2 : m.player1;
+      if (loser === player && (!lastLoss || m.round > lastLoss.round)) {
+        lastLoss = m;
+      }
+    }
+    if (lastLoss) remaining.push({ player, loss: lastLoss });
+  }
+
+  const bracketOrder = { grandFinal: 0, winners: 1, losers: 2 };
+  remaining.sort((a, b) => {
+    const rd = (b.loss.round || 0) - (a.loss.round || 0);
+    if (rd !== 0) return rd;
+    return (bracketOrder[a.loss.bracket] ?? 1) - (bracketOrder[b.loss.bracket] ?? 1);
+  });
+
+  let pos = result.length > 0 ? result[result.length - 1].rank + result[result.length - 1].players.length : 1;
+  let i = 0;
+  while (i < remaining.length) {
+    const group = [remaining[i]];
+    const ref = group[0].loss;
+    while (i + 1 < remaining.length) {
+      const nxt = remaining[i + 1];
+      if (nxt.loss.round === ref.round && nxt.loss.bracket === ref.bracket) {
+        group.push(nxt);
+        i++;
+      } else {
+        break;
+      }
+    }
+    const players = group.map(p => p.player);
+    const label = players.length === 1 ? ` ${pos}${getOrdinal(pos)} Place` : ` ${pos}${getOrdinal(pos)}-${pos + players.length - 1}${getOrdinal(pos + players.length - 1)}`;
+    addRankingEntry(result, pos, label, players, pts(pos));
+    pos += players.length;
+    i++;
+  }
+
+  return result;
+}
+
+export function computeRankings(matches, bracketType, rankScores, participants) {
+  if (!matches || matches.length === 0) return [];
+
+  const hasPlayedMatches = matches.some(m => m.winner != null && m.isPlayed);
+  if (!hasPlayedMatches) return [];
+
+  const nameToId = {};
+  if (participants) {
+    for (const p of participants) {
+      nameToId[p.name] = p.id;
+    }
+  }
+
+  let rankings;
+  if (bracketType === 'double') {
+    rankings = computeDoubleElimRankings(matches, rankScores);
+  } else {
+    rankings = computeSingleElimRankings(matches, rankScores);
+  }
+
+  if (participants) {
+    for (const entry of rankings) {
+      entry.players = entry.players.map(name => ({ name, id: nameToId[name] || null }));
+    }
+  }
+
+  return rankings;
+}

@@ -190,32 +190,124 @@ Total: 110 tests across 11 files
 - `src/components/CreateTournament.jsx`: Input validation for name length, maxParticipants, date ordering
 - `.env.example`: Created for developer onboarding
 
-### Updated Firestore Security Rules (for Firebase Console)
+## Iteration 9: UAT Testing Fixes — Score Awarding, Player Join, Restricted Page
+
+### Changes
+- `firestore.rules`: Users read rule opened to all auth users (admin needs `getDoc` to read player docs before awarding scores). Users update rule allows `score`-only changes (via `diff().affectedKeys().hasOnly(["score"])` or empty diff for `increment(0)` no-ops). Tournament update rule adds `canJoinTournament()` for players to join open tournaments. Invites read/update opened to all auth users (create/delete remain admin-locked).
+- `src/components/TournamentDetail.jsx`: Score award flow now only sets `scoresAssigned` after ALL player updates succeed. Skips `increment(0)` calls. Replaced silent `catch {}` with `console.warn`.
+- `src/components/RestrictedAccess.jsx` + `.css`: Standalone page with gradient background and centered card, no app chrome visible.
+- `.env` / `.env.dev` / `package.json`: Env files split, `vite --mode dev` for dev mode.
+- `src/release-notes.json`: Added `beta-v0.3` entry.
+
+### Key Decisions
+- Users read: any authenticated user can read any user doc. Names/emails are already public via tournament participant lists. This is required for leaderboard queries and admin score-award `getDoc` calls.
+- Users update: any authenticated user can update the `score` field on any user doc. This is required for tournament score awarding. No other fields (role, name, email) can be modified cross-user.
+- Score awarding only marks `scoresAssigned: true` after all player updates succeed. If any fails (e.g., rules deny), the flag stays false and the admin can retry.
+
+### Security Fixes Applied
+
+#### 1. Firestore Rules (Complete Rewrite)
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "tournament_admin"];
+    }
+
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isValidTournament() {
+      return request.resource.data.name is string
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.maxParticipants >= 2
+        && request.resource.data.maxParticipants <= 64
+        && request.resource.data.bracketType in ["single", "double"]
+        && request.resource.data.adminId == request.auth.uid;
+    }
+
+    function canJoinTournament() {
+      return resource.data.published == true
+        && request.time >= resource.data.regStart
+        && request.time < resource.data.regEnd
+        && resource.data.participants.size() < resource.data.maxParticipants
+        && request.resource.data.participants.size() == resource.data.participants.size() + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participants"]);
+    }
+
     match /tournaments/{tournamentId} {
+      allow read: if request.auth != null
+        && (resource.data.published == true
+            || resource.data.adminId == request.auth.uid
+            || isAdmin());
+      allow create: if request.auth != null
+        && isAdmin()
+        && isValidTournament();
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.adminId
+            || canJoinTournament());
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.adminId;
+    }
+
+    match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.adminId == request.auth.uid;
+        && request.auth.uid == userId;
       allow update: if request.auth != null
-                    && request.auth.uid == resource.data.adminId;
+        && (request.auth.uid == userId
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(["score"])
+            || request.resource.data.diff(resource.data).affectedKeys().size() == 0);
       allow delete: if request.auth != null
-                    && request.auth.uid == resource.data.adminId;
+        && request.auth.uid == userId;
     }
-    match /users/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
+
+    match /invites/{inviteId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && isSuperAdmin();
+      allow update: if request.auth != null;
+      allow delete: if false;
     }
+
     match /logs/{logId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow read: if false;
+      allow delete: if false;
+      allow update: if false;
     }
   }
 }
 ```
 
+#### 2. Invite System — Transactional Consumption
+- `consumeInvite` now uses `runTransaction` to atomically validate and consume invites (TOCTOU fix)
+- Re-reads invite doc inside the transaction, checks `used`, `usedCount`, `expiresAt`, then writes
+- `isEmailInvited` now filters `where("used", "==", false)` — consumed invites no longer grant access
+
+#### 3. Leaderboard — Proper Query Filter
+- Changed from `query(usersRef)` (which read ALL user docs and would fail with rule `userId == uid or score > 0`)
+- Now uses `query(usersRef, where("score", ">", 0))` — only returns users with scores, passes the rule
+- Removed client-side `.filter()` since the query already excludes scoreless users
+
+#### 4. Firebase Hosting — Security Headers
+Added `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`, `X-XSS-Protection` to hosting config.
+
+#### 5. Composite Index
+Added `email ASC, used ASC` composite index for the `isEmailInvited` query.
+
+### Changes:
+- `firestore.rules`: Complete rewrite with role-based access on all collections, input validation on tournament creates
+- `src/utils/invite.js`: TOCTOU fix via `runTransaction`; `isEmailInvited` now filters `used == false`
+- `src/firebase.js`: Added `runTransaction` to imports/exports
+- `src/components/Leaderboard.jsx`: Added `where("score", ">", 0)` to query, removed client-side `.filter()`
+- `firebase.json`: Added security headers
+- `firestore.indexes.json`: Added `invites` composite index
+- `.env`: Added `VITE_ALLOW_OPEN_REGISTRATION=true`
+- `.env.example`: Added `VITE_ALLOW_OPEN_REGISTRATION`
 ## Iteration 5: Role-Based Access Control
 
 ### Feature: Global Admin/Player Role System
