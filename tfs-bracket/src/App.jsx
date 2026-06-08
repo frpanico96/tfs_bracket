@@ -50,7 +50,7 @@ function App() {
   });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [dismissedInvite, setDismissedInvite] = useState(false);
-  const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
+  const version = import.meta.env.VITE_INT_VERSION || import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
   const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized, userDoc } = useUserRole(user, inviteToken);
   const addToast = useToast();
 

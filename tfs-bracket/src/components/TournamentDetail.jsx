@@ -429,6 +429,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
           <p>
             <strong>Admin:</strong> {t.adminName}
           </p>
+          {t.game?.name && (
+            <p>
+              <strong>Game:</strong> {t.game.name}
+            </p>
+          )}
           <p>
             <strong>Registration:</strong>{" "}
             {regStartDate ? regStartDate.toLocaleString() : "TBD"} -{" "}
@@ -442,7 +447,23 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
               ? "Open"
               : "Draft"}
           </p>
+          {t.description && (
+            <p className="detail-desc">
+              <strong>Description:</strong> {t.description}
+            </p>
+          )}
+          {t.twitchUrl && (
+            <p>
+              <strong>Stream:</strong>{" "}
+              <a href={t.twitchUrl} target="_blank" rel="noopener noreferrer">{t.twitchUrl}</a>
+            </p>
+          )}
         </div>
+        {t.imageUrl && (
+          <div className="detail-image-wrapper">
+            <img src={t.imageUrl} alt="" className="detail-image" />
+          </div>
+        )}
 
         {!t.started && (
           <>
