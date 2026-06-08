@@ -7,6 +7,7 @@ import {
 import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
 import { useToast } from "../hooks/useToast";
+import GamePicker from "./GamePicker";
 
 export default function CreateTournament({ user, onCancel, onCreated }) {
   const [name, setName] = useState("");
@@ -14,6 +15,10 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
   const [regStart, setRegStart] = useState("");
   const [regEnd, setRegEnd] = useState("");
   const [bracketType, setBracketType] = useState("single");
+  const [game, setGame] = useState(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [twitchUrl, setTwitchUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState({});
   const addToast = useToast();
@@ -28,6 +33,9 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
     if (!regEnd) errs.regEnd = "Registration end is required";
     if (regStart && regEnd && new Date(regEnd) <= new Date(regStart)) {
       errs.regEnd = "End must be after start";
+    }
+    if (twitchUrl && !twitchUrl.match(/^https?:\/\/(www\.)?twitch\.tv\//i)) {
+      errs.twitchUrl = "Must be a valid Twitch URL (https://twitch.tv/...)";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -52,6 +60,10 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         bracketType,
         participants: [],
         matches: [],
+        game: game || null,
+        imageUrl: imageUrl.trim() || null,
+        description: description.trim() || null,
+        twitchUrl: twitchUrl.trim() || null,
       });
       onCreated({
         id: docRef.id,
@@ -66,6 +78,10 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         bracketType,
         participants: [],
         matches: [],
+        game: game || null,
+        imageUrl: imageUrl.trim() || null,
+        description: description.trim() || null,
+        twitchUrl: twitchUrl.trim() || null,
       });
       logEvent({ action: "create_tournament", details: { tournamentId: docRef.id, name, adminId: user.uid } });
     } catch (error) {
@@ -141,6 +157,39 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
             required
           />
           {errors.regEnd && <span className="field-error">{errors.regEnd}</span>}
+        </label>
+        <label>
+          Game
+          <GamePicker value={game} onChange={setGame} />
+        </label>
+        <label>
+          Tournament Image URL
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+          />
+        </label>
+        <label>
+          Description
+          <textarea
+            className="create-textarea"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Tell players about your tournament..."
+            rows={4}
+          />
+        </label>
+        <label className={errors.twitchUrl ? "field-invalid" : ""}>
+          Twitch Stream URL
+          <input
+            type="url"
+            value={twitchUrl}
+            onChange={(e) => { setTwitchUrl(e.target.value); if (errors.twitchUrl) setErrors((prev) => ({ ...prev, twitchUrl: "" })); }}
+            placeholder="https://twitch.tv/yourchannel"
+          />
+          {errors.twitchUrl && <span className="field-error">{errors.twitchUrl}</span>}
         </label>
         <div className="buttons">
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={creating}>

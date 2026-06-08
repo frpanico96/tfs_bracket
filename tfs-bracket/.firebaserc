@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "tfs-bracket"
+    "default": "tfs-bracket",
+    "uat": "tfs-bracket",
+    "int": "tfs-bracket-dev"
   }
 }
