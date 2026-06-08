@@ -234,6 +234,11 @@ body {
   color: #fff;
 }
 
+.version-badge-dev {
+  background: #0ea5e9;
+  color: #fff;
+}
+
 .version-badge-empty {
   background: var(--text-muted);
   color: #fff;
