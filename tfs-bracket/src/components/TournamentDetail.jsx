@@ -430,7 +430,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
             <strong>Admin:</strong> {t.adminName}
           </p>
           {t.game?.name && (
-            <p>
+            <p className="detail-game-row">
+              {t.game.image && <img src={t.game.image} alt="" className="detail-game-icon" />}
               <strong>Game:</strong> {t.game.name}
             </p>
           )}

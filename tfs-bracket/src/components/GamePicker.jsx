@@ -1,19 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { fetchFightingGames, searchGames } from "../utils/games";
+import { searchGames } from "../utils/games";
 
 export default function GamePicker({ value, onChange }) {
-  const [games, setGames] = useState([]);
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef(null);
   const ref = useRef(null);
-
-  useEffect(() => {
-    fetchFightingGames().then((list) => {
-      setGames(list);
-      setLoading(false);
-    });
-  }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -23,14 +17,42 @@ export default function GamePicker({ value, onChange }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const results = searchGames(games, query);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      debounceRef.current = setTimeout(() => {
+        setResults([]);
+        setSearching(false);
+      }, 0);
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      };
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const games = await searchGames(query.trim());
+      setResults(games);
+      setSearching(false);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  const handleSelect = (game) => {
+    onChange(game);
+    setOpen(false);
+    setQuery("");
+    setResults([]);
+  };
+
   const selected = value || null;
 
   return (
     <div className="game-picker" ref={ref}>
       <div
         className={`game-picker-trigger ${open ? "game-picker-open" : ""}`}
-        onClick={() => { if (!loading) setOpen(!open); }}
+        onClick={() => setOpen(!open)}
       >
         {selected ? (
           <span className="game-picker-selected">
@@ -40,9 +62,7 @@ export default function GamePicker({ value, onChange }) {
             {selected.name}
           </span>
         ) : (
-          <span className="game-picker-placeholder">
-            {loading ? "Loading games..." : "Select a game"}
-          </span>
+          <span className="game-picker-placeholder">Select a game</span>
         )}
         <span className="game-picker-arrow">{open ? "▲" : "▼"}</span>
       </div>
@@ -51,20 +71,24 @@ export default function GamePicker({ value, onChange }) {
           <input
             type="text"
             className="game-picker-search"
-            placeholder="Search games..."
+            placeholder="Type to search games..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
           <div className="game-picker-list">
-            {results.length === 0 ? (
+            {searching ? (
+              <div className="game-picker-empty">Searching...</div>
+            ) : !query.trim() ? (
+              <div className="game-picker-empty">Start typing to search games</div>
+            ) : results.length === 0 ? (
               <div className="game-picker-empty">No games found</div>
             ) : (
               results.map((g) => (
                 <div
                   key={g.id}
                   className={`game-picker-item ${value?.id === g.id ? "game-picker-item-selected" : ""}`}
-                  onClick={() => { onChange(g); setOpen(false); setQuery(""); }}
+                  onClick={() => handleSelect(g)}
                 >
                   {g.image && (
                     <img src={g.image} alt="" className="game-picker-item-img" />
