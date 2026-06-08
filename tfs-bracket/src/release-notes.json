@@ -1,7 +1,15 @@
 [
   {
+    "version": "beta-v0.3.1",
+    "environment": "int",
+    "date": "2026-06-08",
+    "notes": [
+      "Fix: multi-use invite links no longer break after the first use (usedCount correctly tracks remaining uses)"
+    ]
+  },
+  {
     "version": "beta-v0.3",
-    "environment": "dev",
+    "environment": "int",
     "date": "2026-06-08",
     "notes": [
       "Game picker: search thousands of fighting games via start.gg API with live search-as-you-type",
