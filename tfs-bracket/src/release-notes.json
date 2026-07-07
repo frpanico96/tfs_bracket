@@ -1,5 +1,15 @@
 [
   {
+    "version": "beta-v0.4.1",
+    "environment": "int",
+    "date": "2026-07-07",
+    "notes": [
+      "Fix: double elimination grand final reset match (gf-m1) no longer blocks tournament completion when winners bracket player wins the grand final",
+      "Fix: scores now correctly auto-awarded when a double elimination tournament completes without a bracket reset",
+      "Existing user linking: approving a public registration reuses an existing user doc with the same name instead of creating a duplicate, preserving accumulated scores"
+    ]
+  },
+  {
     "version": "beta-v0.4",
     "environment": "int",
     "date": "2026-07-07",

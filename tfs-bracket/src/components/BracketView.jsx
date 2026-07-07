@@ -271,7 +271,6 @@ function DoubleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
 
   return (
     <div className="bracket double-elimination">
-      <h3>Bracket</h3>
       <div className="de-bracket-layout">
         <div className="de-section">
           <h4 className="de-section-title">Winners Bracket</h4>
