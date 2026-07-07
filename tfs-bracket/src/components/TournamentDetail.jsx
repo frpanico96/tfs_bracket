@@ -78,7 +78,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const rankingsLoading = rawRankings.length > 0 && !rankingsReady;
   const rankingsInfo = t.started && rawRankings.length === 0 && t.matches?.some(m => m.isPlayed);
 
-  const isTournamentComplete = t.matches?.length > 0 && t.matches.every((m) => m.winner != null);
+  const matchesToComplete = t.matches?.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD")) || [];
+  const isTournamentComplete = matchesToComplete.length > 0 && matchesToComplete.every((m) => m.winner != null);
 
   useEffect(() => {
     if (!showAddParticipant) return;
@@ -202,7 +203,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     onUpdate({ ...t, matches });
 
     const updatedTournament = { ...t, matches };
-    const allDone = updatedTournament.matches.every((m) => m.winner != null);
+    const activeMatches = updatedTournament.matches.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD"));
+    const allDone = activeMatches.length > 0 && activeMatches.every((m) => m.winner != null);
     if (allDone && !t.scoresAssigned) {
       const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants);
       if (!t.rankScores) {
@@ -487,8 +489,15 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         addToast(`A participant named "${entry.name}" already exists.`, "error");
         return;
       }
-      const userDocRef = await addDoc(usersRef, { name: entry.name, provider: "manual", role: "player", createdAt: serverTimestamp() });
-      const newParticipant = { id: userDocRef.id, name: entry.name, email: "" };
+      const exactSnap = await getDocs(query(usersRef, where("name", "==", entry.name)));
+      let newParticipant;
+      if (!exactSnap.empty) {
+        const existingUser = exactSnap.docs[0];
+        newParticipant = { id: existingUser.id, name: existingUser.data().name, email: existingUser.data().email || "" };
+      } else {
+        const userDocRef = await addDoc(usersRef, { name: entry.name, provider: "manual", role: "player", createdAt: serverTimestamp() });
+        newParticipant = { id: userDocRef.id, name: entry.name, email: "" };
+      }
       const nameSet = { ...(t.participantNameSet || {}), [entry.name.toLowerCase()]: true };
       const ref = doc(db, "tournaments", t.id);
       await updateDoc(ref, {
