@@ -1,5 +1,15 @@
 [
   {
+    "version": "beta-v0.4.2",
+    "environment": "int",
+    "date": "2026-07-07",
+    "notes": [
+      "Mobile responsiveness: header now wraps on narrow screens, display name hidden on phones, version badges compacted",
+      "Fix: admin sidebar no longer disappears on iPhone — collapsed state now has explicit 44px height so the toggle button is always visible",
+      "Fix: Reset Bracket button is hidden when tournament is complete"
+    ]
+  },
+  {
     "version": "beta-v0.4.1",
     "environment": "int",
     "date": "2026-07-07",
