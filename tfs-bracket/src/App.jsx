@@ -28,6 +28,8 @@ import RestrictedAccess from "./components/RestrictedAccess";
 import SetDisplayName from "./components/SetDisplayName";
 import BaseModal from "./components/BaseModal";
 import useUserRole from "./hooks/useUserRole";
+import PublicRegistration from "./components/PublicRegistration";
+import PublicBracketView from "./components/PublicBracketView";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -183,6 +185,17 @@ function App() {
     setView("list");
     setSelectedTournament(null);
   };
+
+  const regToken = new URLSearchParams(window.location.search).get("register");
+  const bracketToken = new URLSearchParams(window.location.search).get("bracket");
+
+  if (regToken) {
+    return <PublicRegistration token={regToken} />;
+  }
+
+  if (bracketToken) {
+    return <PublicBracketView token={bracketToken} />;
+  }
 
   if (!authReady) {
     return (

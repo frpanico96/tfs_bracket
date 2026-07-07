@@ -220,7 +220,6 @@ function SingleBracketView({ matches, onMatchClick, isAdmin, onMatchWinCondition
 
   return (
     <div className="bracket">
-      <h3>Bracket</h3>
       <div className="bracket-rounds">
         {rounds.map((roundMatches, roundIndex) => (
           <div key={roundIndex} className="round">

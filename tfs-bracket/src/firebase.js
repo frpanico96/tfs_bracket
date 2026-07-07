@@ -30,6 +30,9 @@ export const tournamentsRef = collection(db, "tournaments");
 export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "logs");
 export const invitesRef = collection(db, "invites");
+export const registrationTokensRef = collection(db, "registrationTokens");
+export const registrationEntriesRef = collection(db, "registrationEntries");
+export const bracketTokensRef = collection(db, "bracketTokens");
 
 export {
   addDoc,

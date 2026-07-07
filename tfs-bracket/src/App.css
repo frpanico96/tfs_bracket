@@ -517,6 +517,90 @@ body {
   margin-top: 10px;
 }
 
+.reg-link-section {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.reg-link-display {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.reg-link-display input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.reg-link-display input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+
+.bracket-link-expiry {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pending-entries-section {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.pending-entries-list {
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.pending-entries-list ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pending-entry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.pending-entry-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.pending-entry-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
 .btn-primary {
   background: var(--primary);
   color: white;
@@ -2748,6 +2832,135 @@ body {
 @keyframes rowEnter {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+.public-reg-error {
+  color: var(--danger);
+  font-size: 15px;
+  margin-top: 16px;
+}
+
+.public-reg-success {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.public-reg-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--success);
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 auto 16px;
+}
+
+.public-reg-success p {
+  margin-bottom: 8px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.public-reg-bracket-link {
+  margin-top: 12px;
+}
+
+.public-reg-bracket-link a {
+  display: inline-block;
+  padding: 10px 22px;
+  background: var(--primary);
+  color: white;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+  transition: var(--transition);
+}
+
+.public-reg-bracket-link a:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.public-reg-tournament-name {
+  font-size: 20px;
+  color: var(--text);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.public-reg-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.public-reg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.public-reg-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+}
+
+.public-reg-label input {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  transition: var(--transition);
+}
+
+.public-reg-label input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+
+.public-bracket-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.public-bracket-header {
+  background: var(--surface);
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.public-bracket-header h1 {
+  font-size: 24px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.public-bracket-meta {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.public-bracket-content {
+  flex: 1;
+  padding: 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 

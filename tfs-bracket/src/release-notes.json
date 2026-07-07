@@ -1,7 +1,20 @@
 [
   {
-    "version": "beta-v0.3.1",
+    "version": "beta-v0.4",
     "environment": "int",
+    "date": "2026-07-07",
+    "notes": [
+      "Public registration: tournament admins generate shareable registration links; anyone with the link can sign up with just their name",
+      "Pending approvals: admin approves or denies each registration from the Tournament Detail page before they appear as participants",
+      "Participant name uniqueness: participantNameSet on tournament documents prevents duplicate names across all add flows",
+      "Bracket share links: admins generate expiring bracket links (30 days) from the started tournament page; link resolves via bracketTokens collection",
+      "Firestore rules: registrationTokens, registrationEntries, and bracketTokens collections with permissive public reads and gated creates",
+      "Error modals: registration link errors shown in a modal instead of a bottom toast"
+    ]
+  },
+  {
+    "version": "beta-v0.3.1",
+    "environment": "all",
     "date": "2026-06-08",
     "notes": [
       "Fix: multi-use invite links no longer break after the first use (usedCount correctly tracks remaining uses)"
@@ -9,7 +22,7 @@
   },
   {
     "version": "beta-v0.3",
-    "environment": "int",
+    "environment": "all",
     "date": "2026-06-08",
     "notes": [
       "Game picker: search thousands of fighting games via start.gg API with live search-as-you-type",

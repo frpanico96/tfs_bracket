@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, serverTimestamp } from "../firebase";
+import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, setDoc, deleteDoc, serverTimestamp, registrationTokensRef, registrationEntriesRef, bracketTokensRef, query, where, onSnapshot } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
@@ -51,6 +51,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [publishing, setPublishing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [regLink, setRegLink] = useState(null);
+  const [regLinkError, setRegLinkError] = useState(null);
+  const [pendingEntries, setPendingEntries] = useState([]);
+  const [showEntries, setShowEntries] = useState(false);
+  const [bracketLink, setBracketLink] = useState(null);
   const addToast = useToast();
 
   const rawRankings = useMemo(
@@ -94,6 +99,15 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  useEffect(() => {
+    if (!isAdmin || !showEntries) return;
+    const q = query(registrationEntriesRef, where("tournamentId", "==", t.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setPendingEntries(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [isAdmin, showEntries, t.id]);
+
   const handleJoin = () => {
     if (!t.published) return;
     if (t.participants.some((p) => p.id === user.uid)) return;
@@ -107,10 +121,12 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       const ref = doc(db, "tournaments", t.id);
       const name = getUserName(user);
       const newParticipant = { id: user.uid, name, email: user.email };
+      const nameSet = { ...(t.participantNameSet || {}), [name.toLowerCase()]: true };
       await updateDoc(ref, {
         participants: [...t.participants, newParticipant],
+        participantNameSet: nameSet,
       });
-      onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+      onUpdate({ ...t, participants: [...t.participants, newParticipant], participantNameSet: nameSet });
       logEvent({ action: "join_tournament", details: { tournamentId: t.id, userId: user.uid, userName: name } });
       setShowJoinConfirm(false);
     } catch {
@@ -250,10 +266,12 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     const ref = doc(db, "tournaments", t.id);
     const effectiveName = regUser.display_name || regUser.name;
     const newParticipant = { id: regUser.id, name: effectiveName, email: regUser.email || "" };
+    const nameSet = { ...(t.participantNameSet || {}), [effectiveName.toLowerCase()]: true };
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
+      participantNameSet: nameSet,
     });
-    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant], participantNameSet: nameSet });
     logEvent({ action: "add_participant", details: { tournamentId: t.id, participantId: regUser.id, participantName: effectiveName } });
     setShowAddParticipant(false);
   };
@@ -266,11 +284,13 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (t.participants.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
     const userDoc = await addDoc(usersRef, { name, provider: "manual", role: "player", createdAt: serverTimestamp() });
     const newParticipant = { id: userDoc.id, name, email: "" };
+    const nameSet = { ...(t.participantNameSet || {}), [name.toLowerCase()]: true };
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
+      participantNameSet: nameSet,
     });
-    onUpdate({ ...t, participants: [...t.participants, newParticipant] });
+    onUpdate({ ...t, participants: [...t.participants, newParticipant], participantNameSet: nameSet });
     logEvent({ action: "add_manual_participant", details: { tournamentId: t.id, participantName: name, participantId: userDoc.id } });
     setAddParticipantName("");
     setShowAddParticipant(false);
@@ -294,11 +314,14 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         email: `player${num}@example.com`,
       };
     });
+    const nameSet = { ...(t.participantNameSet || {}) };
+    toAdd.forEach((p) => { nameSet[p.name.toLowerCase()] = true; });
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, ...toAdd],
+      participantNameSet: nameSet,
     });
-    onUpdate({ ...t, participants: [...t.participants, ...toAdd] });
+    onUpdate({ ...t, participants: [...t.participants, ...toAdd], participantNameSet: nameSet });
     logEvent({ action: "add_fake_users", details: { tournamentId: t.id, count: toAdd.length } });
   };
 
@@ -353,12 +376,15 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin || !editParticipant) return;
     const name = editParticipantName.trim();
     if (!name) return;
+    const nameSet = { ...(t.participantNameSet || {}) };
+    delete nameSet[editParticipant.name.toLowerCase()];
+    nameSet[name.toLowerCase()] = true;
     const updatedParticipants = t.participants.map((p) =>
       p.id === editParticipant.id ? { ...p, name, email: editParticipantEmail.trim() || p.email } : p
     );
     const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { participants: updatedParticipants });
-    onUpdate({ ...t, participants: updatedParticipants });
+    await updateDoc(ref, { participants: updatedParticipants, participantNameSet: nameSet });
+    onUpdate({ ...t, participants: updatedParticipants, participantNameSet: nameSet });
     logEvent({ action: "edit_participant", details: { tournamentId: t.id, participantId: editParticipant.id, previousName: editParticipant.name, newName: name } });
     setEditParticipant(null);
     setEditParticipantName("");
@@ -373,9 +399,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const handleConfirmRemove = async () => {
     if (!showRemoveConfirm) return;
     const updatedParticipants = t.participants.filter((p) => p.id !== showRemoveConfirm.id);
+    const nameSet = { ...(t.participantNameSet || {}) };
+    delete nameSet[showRemoveConfirm.name.toLowerCase()];
     const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { participants: updatedParticipants });
-    onUpdate({ ...t, participants: updatedParticipants });
+    await updateDoc(ref, { participants: updatedParticipants, participantNameSet: nameSet });
+    onUpdate({ ...t, participants: updatedParticipants, participantNameSet: nameSet });
     logEvent({ action: "remove_participant", details: { tournamentId: t.id, participantId: showRemoveConfirm.id, participantName: showRemoveConfirm.name } });
     setShowRemoveConfirm(null);
   };
@@ -404,6 +432,84 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin) return;
     logEvent({ action: "delete_tournament", details: { tournamentId: t.id, adminId: user.uid } });
     onDelete(t.id);
+  };
+
+  const handleGenerateRegLink = async () => {
+    if (!isAdmin) return;
+    if (!t.published) {
+      setRegLinkError("Tournament must be published before generating registration links.");
+      return;
+    }
+    try {
+      const tokenId = crypto.randomUUID();
+      await setDoc(doc(registrationTokensRef, tokenId), {
+        tournamentId: t.id,
+        maxUses: t.maxParticipants,
+        usedCount: 0,
+        createdAt: serverTimestamp(),
+      });
+      const link = `${window.location.origin}/?register=${tokenId}`;
+      setRegLink(link);
+      addToast("Registration link generated!", "success");
+    } catch (e) {
+      setRegLinkError(e?.message || "Failed to generate registration link");
+    }
+  };
+
+  const handleGenerateBracketLink = async () => {
+    if (!isAdmin) return;
+    try {
+      const tokenId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await setDoc(doc(bracketTokensRef, tokenId), {
+        tournamentId: t.id,
+        expiresAt,
+        createdAt: serverTimestamp(),
+      });
+      const link = `${window.location.origin}/?bracket=${tokenId}`;
+      setBracketLink(link);
+      addToast("Bracket link generated!", "success");
+    } catch (e) {
+      setRegLinkError(e?.message || "Failed to generate bracket link");
+    }
+  };
+
+  const handleApproveEntry = async (entry) => {
+    if (!isAdmin) return;
+    try {
+      const existing = pendingEntries.find((e) => e.id !== entry.id && e.name.toLowerCase() === entry.name.toLowerCase());
+      if (existing) {
+        addToast(`A pending entry with the name "${entry.name}" already exists.`, "error");
+        return;
+      }
+      const nameTaken = (t.participants || []).some((p) => p.name.toLowerCase() === entry.name.toLowerCase());
+      if (nameTaken) {
+        addToast(`A participant named "${entry.name}" already exists.`, "error");
+        return;
+      }
+      const userDocRef = await addDoc(usersRef, { name: entry.name, provider: "manual", role: "player", createdAt: serverTimestamp() });
+      const newParticipant = { id: userDocRef.id, name: entry.name, email: "" };
+      const nameSet = { ...(t.participantNameSet || {}), [entry.name.toLowerCase()]: true };
+      const ref = doc(db, "tournaments", t.id);
+      await updateDoc(ref, {
+        participants: [...(t.participants || []), newParticipant],
+        participantNameSet: nameSet,
+      });
+      await deleteDoc(doc(registrationEntriesRef, entry.id));
+      onUpdate({ ...t, participants: [...(t.participants || []), newParticipant], participantNameSet: nameSet });
+      logEvent({ action: "approve_registration", details: { tournamentId: t.id, entryId: entry.id, name: entry.name } });
+    } catch {
+      addToast("Failed to approve entry", "error");
+    }
+  };
+
+  const handleDenyEntry = async (entry) => {
+    if (!isAdmin) return;
+    try {
+      await deleteDoc(doc(registrationEntriesRef, entry.id));
+    } catch {
+      addToast("Failed to deny entry", "error");
+    }
   };
 
   const getDefaultWinCondition = () => {
@@ -473,6 +579,48 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 ← Back
               </button>
             </div>
+
+            {isAdmin && t.published && (
+              <div className="reg-link-section">
+                <button className="btn-secondary" onClick={handleGenerateRegLink}>
+                  Generate Registration Link
+                </button>
+                {regLink && (
+                  <div className="reg-link-display">
+                    <input type="text" readOnly value={regLink} onClick={(e) => e.target.select()} />
+                    <button className="btn-icon" onClick={() => { navigator.clipboard.writeText(regLink); addToast("Link copied!", "success"); }} title="Copy">📋</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isAdmin && t.published && (
+              <div className="pending-entries-section">
+                <button className="btn-secondary" onClick={() => setShowEntries(!showEntries)}>
+                  {showEntries ? "Hide" : "Show"} Pending Registrations
+                </button>
+                {showEntries && (
+                  <div className="pending-entries-list">
+                    {pendingEntries.length === 0 ? (
+                      <p className="empty">No pending registrations</p>
+                    ) : (
+                      <ul>
+                        {pendingEntries.map((entry) => (
+                          <li key={entry.id} className="pending-entry-item">
+                            <span className="pending-entry-name">{entry.name}</span>
+                            <span className="pending-entry-actions">
+                              <button className="btn-primary btn-sm" onClick={() => handleApproveEntry(entry)}>Approve</button>
+                              <button className="btn-danger btn-sm" onClick={() => handleDenyEntry(entry)}>Deny</button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="participants-section">
             <h3>
               Participants ({t.participants.length}/{t.maxParticipants})
@@ -564,6 +712,20 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 </button>
               )}
             </div>
+            {isAdmin && (
+              <div className="reg-link-section">
+                <button className="btn-secondary" onClick={handleGenerateBracketLink}>
+                  Generate Bracket Link
+                </button>
+                {bracketLink && (
+                  <div className="reg-link-display">
+                    <input type="text" readOnly value={bracketLink} onClick={(e) => e.target.select()} />
+                    <button className="btn-icon" onClick={() => { navigator.clipboard.writeText(bracketLink); addToast("Link copied!", "success"); }} title="Copy">📋</button>
+                    <span className="bracket-link-expiry">Expires in 30 days</span>
+                  </div>
+                )}
+              </div>
+            )}
             {swapMode && (
               <div className="swap-banner">
                 <span>Click two players to swap them</span>
@@ -781,6 +943,19 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
           <button className="btn-primary" onClick={handleConfirmJoin} disabled={joining}>
             {joining && <span className="saving-throbber" />}
             {joining ? "Joining..." : "Confirm"}
+          </button>
+        </div>
+      </BaseModal>
+
+      <BaseModal
+        isOpen={!!regLinkError}
+        onClose={() => setRegLinkError(null)}
+        title="Registration Link Error"
+      >
+        <p>{regLinkError}</p>
+        <div className="modal-actions">
+          <button className="btn-primary" onClick={() => setRegLinkError(null)}>
+            OK
           </button>
         </div>
       </BaseModal>
