@@ -237,7 +237,7 @@ describe("consumeInvite", () => {
     expect(mockRunTransaction).toHaveBeenCalledWith(mockDb, expect.any(Function));
     expect(mockTransaction.update).toHaveBeenCalledWith(
       { id: "invite-1", path: "invites/invite-1" },
-      { used: true, usedCount: 1 },
+      { usedCount: 1 },
     );
   });
 });

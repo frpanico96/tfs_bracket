@@ -75,7 +75,12 @@ export async function consumeInvite(inviteId) {
       const exp = data.expiresAt.toMillis ? data.expiresAt.toMillis() : data.expiresAt;
       if (exp < Date.now()) throw new Error("Invite expired");
     }
-    transaction.update(ref, { usedCount: increment(1), used: true });
+    const newCount = (data.usedCount || 0) + 1;
+    const updates = { usedCount: increment(1) };
+    if (data.maxUses == null || newCount >= data.maxUses) {
+      updates.used = true;
+    }
+    transaction.update(ref, updates);
   });
 }
 

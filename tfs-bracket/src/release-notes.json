@@ -1,6 +1,31 @@
 [
   {
+    "version": "beta-v0.3.1",
+    "environment": "int",
+    "date": "2026-06-08",
+    "notes": [
+      "Fix: multi-use invite links no longer break after the first use (usedCount correctly tracks remaining uses)"
+    ]
+  },
+  {
+    "version": "beta-v0.3",
+    "environment": "int",
+    "date": "2026-06-08",
+    "notes": [
+      "Game picker: search thousands of fighting games via start.gg API with live search-as-you-type",
+      "Game images: box art shown on tournament cards, detail page, and game picker",
+      "Twitch link: add a Twitch stream URL to tournaments, shown as icon on cards and detail page",
+      "Tournament description: add a full description when creating tournaments",
+      "Custom tournament image: add a banner image URL to your tournament (shown as card thumbnail)",
+      "Registration start/end: both dates now shown on card tiles with times",
+      "Registration logic: Join Open badge only appears after registration start date has passed",
+      "INT environment: new isolated Firebase project (tfs-bracket-dev) for integration testing",
+      "Env-specific release notes: release notes now filtered by environment"
+    ]
+  },
+  {
     "version": "beta-v0.2",
+    "environment": "all",
     "date": "2026-06-04",
     "notes": [
       "Display name: first-time login prompts for a display name; shown consistently across Header, Leaderboard, and participant lists",
@@ -57,6 +82,7 @@
   },
   {
     "version": "beta-v0.1",
+    "environment": "all",
     "date": "2026-05-15",
     "notes": [
       "Invite-only access: only invited users can log in",

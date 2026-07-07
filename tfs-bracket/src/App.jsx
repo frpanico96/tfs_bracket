@@ -42,6 +42,7 @@ function App() {
     return params.get("invite") || null;
   });
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const [releaseNotesEnv, setReleaseNotesEnv] = useState(null);
   const [localDisplayName, setLocalDisplayName] = useState(null);
   const [pendingTournamentId, setPendingTournamentId] = useState(() => {
     const v = localStorage.getItem("tfs_view");
@@ -50,9 +51,18 @@ function App() {
   });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [dismissedInvite, setDismissedInvite] = useState(false);
-  const version = import.meta.env.VITE_DEV_VERSION || "beta-v0.2";
+  const env = import.meta.env.DEV ? "dev" : import.meta.env.VITE_ENV || "prod";
+  const version = env === "int" ? (import.meta.env.VITE_INT_VERSION || "beta-v0.3")
+    : env === "uat" ? (__APP_VERSION__ || "beta-v0.2")
+    : env === "dev" ? (import.meta.env.VITE_DEV_VERSION || __APP_VERSION__ || "beta-v0.3")
+    : (import.meta.env.VITE_PROD_VERSION || __APP_VERSION__ || "beta-v0.2");
   const { role, isGlobalAdmin, isSuperAdmin, loading, inviteResult, isAuthorized, userDoc } = useUserRole(user, inviteToken);
   const addToast = useToast();
+
+  const handleVersionClick = (badgeEnv) => {
+    setReleaseNotesEnv(badgeEnv);
+    setShowReleaseNotes(true);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -191,7 +201,7 @@ function App() {
       <>
         <div className="login-container">
           <div className="login-box">
-            <h1>TFS Bracket <VersionBadges onVersionClick={() => setShowReleaseNotes(true)} /></h1>
+            <h1>TFS Bracket <VersionBadges onVersionClick={handleVersionClick} /></h1>
             <p>Create and manage tournament brackets</p>
             <div className="login-buttons">
               <button className="btn-primary login-btn-google" onClick={handleLogin("google")}>
@@ -207,6 +217,7 @@ function App() {
           isOpen={showReleaseNotes}
           onClose={() => setShowReleaseNotes(false)}
           currentVersion={version}
+          env={releaseNotesEnv || env}
         />
       </>
     );
@@ -215,7 +226,7 @@ function App() {
   if (loading || (user && isAuthorized === null)) {
     return (
       <div className="app">
-         <Header user={user} userDoc={userDoc} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={() => setShowReleaseNotes(true)} />
+         <Header user={user} userDoc={userDoc} onLogout={handleLogout} onLogoClick={() => setView("list")} onVersionClick={handleVersionClick} />
         <main className="main">
           <p className="empty">Loading...</p>
         </main>
@@ -249,7 +260,7 @@ function App() {
         onLogoClick={() => setView("list")}
         onInvite={() => setShowInviteModal(true)}
         onNavigate={setView}
-        onVersionClick={() => setShowReleaseNotes(true)}
+        onVersionClick={handleVersionClick}
       />
 
       <main className={`main ${view === "detail" ? "main-full" : ""}`}>
@@ -316,6 +327,7 @@ function App() {
         isOpen={showReleaseNotes}
         onClose={() => setShowReleaseNotes(false)}
         currentVersion={version}
+        env={releaseNotesEnv || env}
       />
 
       <BaseModal isOpen={showLogoutConfirm} onClose={handleCancelLogout} title="Logout">

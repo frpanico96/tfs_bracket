@@ -13,6 +13,7 @@ const baseTournament = (overrides = {}) => ({
   participants: [],
   published: true,
   adminId: "admin-1",
+  regStart: pastDate,
   regEnd: futureDate,
   createdAt: new Date(),
   ...overrides,
@@ -145,10 +146,10 @@ describe("TournamentList", () => {
         { id: "m2", player1: "C", player2: "D", winner: 1, isPlayed: true },
       ],
     });
-    render(
+    const { container } = render(
       <TournamentList tournaments={[t]} user={mockUser} isGlobalAdmin={false} onSelect={() => {}} onCreate={() => {}} onDelete={() => {}} />
     );
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(container.querySelector(".badge-completed")).toBeInTheDocument();
     expect(screen.queryByText("Join Open")).not.toBeInTheDocument();
   });
 
