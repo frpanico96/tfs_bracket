@@ -51,6 +51,7 @@ function App() {
   });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [dismissedInvite, setDismissedInvite] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const env = import.meta.env.DEV ? "dev" : import.meta.env.VITE_ENV || "prod";
   const version = env === "int" ? (import.meta.env.VITE_INT_VERSION || "beta-v0.3")
     : env === "uat" ? (__APP_VERSION__ || "beta-v0.2")
@@ -145,6 +146,15 @@ function App() {
     }
   }, [inviteResult]);
 
+  useEffect(() => {
+    const ref = doc(db, "config", "app");
+    getDoc(ref).then((snap) => {
+      if (snap.exists() && snap.data().maintenanceMode === true) {
+        setMaintenanceMode(true);
+      }
+    }).catch(() => {});
+  }, []);
+
   const handleLogin = (provider) => async () => {
     try {
       if (provider === "discord") {
@@ -230,6 +240,17 @@ function App() {
         <main className="main">
           <p className="empty">Loading...</p>
         </main>
+      </div>
+    );
+  }
+
+  if (maintenanceMode) {
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <h1>TFS Bracket</h1>
+          <p className="maintenance-message">The app is currently under maintenance. Please check back later.</p>
+        </div>
       </div>
     );
   }

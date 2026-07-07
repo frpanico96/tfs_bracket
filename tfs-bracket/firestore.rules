@@ -10,13 +10,19 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
 
+    function notInMaintenance() {
+      return !exists(/databases/$(database)/documents/config/app)
+        || get(/databases/$(database)/documents/config/app).data.maintenanceMode != true;
+    }
+
     function isValidTournament() {
       return request.resource.data.name is string
         && request.resource.data.name.size() <= 100
         && request.resource.data.maxParticipants >= 2
         && request.resource.data.maxParticipants <= 64
         && request.resource.data.bracketType in ["single", "double"]
-        && request.resource.data.adminId == request.auth.uid;
+        && request.resource.data.adminId == request.auth.uid
+        && request.resource.data.size() <= 3000;
     }
 
     function canJoinTournament() {
@@ -28,46 +34,79 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participants"]);
     }
 
+    // ── Kill switch ──────────────────────────────────
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null && isSuperAdmin();
+    }
+
+    // ── Per-user rate limit counters ─────────────────
+
+    match /rateLimits/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Tournaments ──────────────────────────────────
+
     match /tournaments/{tournamentId} {
       allow read: if request.auth != null
         && (resource.data.published == true
             || resource.data.adminId == request.auth.uid
             || isAdmin());
       allow create: if request.auth != null
+        && notInMaintenance()
         && isAdmin()
         && isValidTournament();
       allow update: if request.auth != null
+        && notInMaintenance()
         && (request.auth.uid == resource.data.adminId
             || canJoinTournament());
       allow delete: if request.auth != null
+        && notInMaintenance()
         && request.auth.uid == resource.data.adminId;
     }
+
+    // ── Users ────────────────────────────────────────
 
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
+        && notInMaintenance()
         && (request.auth.uid == userId
             || (isAdmin()
                 && request.resource.data.provider == "manual"
                 && request.resource.data.role == "player"));
       allow update: if request.auth != null
+        && notInMaintenance()
         && (request.auth.uid == userId
             || request.resource.data.diff(resource.data).affectedKeys().hasOnly(["score"])
             || request.resource.data.diff(resource.data).affectedKeys().size() == 0);
       allow delete: if request.auth != null
+        && notInMaintenance()
         && request.auth.uid == userId;
     }
+
+    // ── Invites ──────────────────────────────────────
 
     match /invites/{inviteId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
+        && notInMaintenance()
         && isAdmin();
-      allow update: if request.auth != null;
+      allow update: if request.auth != null
+        && notInMaintenance()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["usedCount", "used"]);
       allow delete: if false;
     }
 
+    // ── Logs ─────────────────────────────────────────
+
     match /logs/{logId} {
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && notInMaintenance()
+        && request.resource.data.keys().size() <= 5;
       allow read: if false;
       allow delete: if false;
       allow update: if false;
