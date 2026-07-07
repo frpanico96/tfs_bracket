@@ -2426,6 +2426,51 @@ body {
     font-size: 18px;
   }
 
+  .header-left {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .header-left .version-badges {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .nav-link {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .version-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    line-height: 18px;
+  }
+
+  .avatar-wrapper {
+    width: 36px;
+    height: 36px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .user-info > span {
+    display: none;
+  }
+
+  .user-info .role-badge {
+    display: none;
+  }
+
+  .btn-invite {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
   .main {
     padding: 20px 16px;
   }
@@ -2438,27 +2483,103 @@ body {
 
   .tournament-detail {
     padding: 12px;
+    height: calc(100dvh - 64px);
   }
 
   .main-full {
     padding-right: 16px;
   }
 
-  .tournament-sidebar {
+  .tournament-sidebar.collapsed {
+    width: 44px !important;
+    height: 44px;
+    bottom: 12px;
     right: 12px;
     top: auto;
-    bottom: 12px;
-    width: 40px !important;
+    border-radius: var(--radius-full);
   }
 
   .tournament-sidebar.open {
     width: 200px;
+    max-height: 40vh;
+    height: auto;
+    overflow-y: auto;
+    bottom: 12px;
+    right: 12px;
+    top: auto;
+  }
+
+  .sidebar-toggle {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    left: 4px;
+    top: 4px;
+  }
+
+  .bracket {
+    height: calc(100dvh - 180px);
+  }
+
+  .bracket.double-elimination {
+    height: calc(100dvh - 180px);
+  }
+
+  .round {
+    min-width: 110px;
+  }
+
+  .round h4 {
+    font-size: 10px;
+  }
+
+  .match {
+    padding: 6px 8px;
+  }
+
+  .match-row {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .match-win-condition {
+    font-size: 9px;
+    padding: 2px 6px;
+    line-height: 16px;
+  }
+
+  .match.clickable::after {
+    font-size: 9px;
+  }
+
+  .match.grand-final.clickable::after {
+    font-size: 9px;
+  }
+
+  .champion-display h3 {
+    font-size: 9px;
+  }
+
+  .champion-name {
+    font-size: 12px;
+  }
+
+  .participant-actions {
+    opacity: 1;
+  }
+
+  .btn-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
   }
 
   .match-score-modal {
     flex-direction: column;
     min-width: 0;
     width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
   }
 
   .match-score-content {
@@ -2476,6 +2597,16 @@ body {
     padding: 16px 0 0;
   }
 
+  .match-score-value {
+    font-size: 28px;
+  }
+
+  .score-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
   .login-box {
     padding: 32px 24px;
   }
@@ -2484,10 +2615,18 @@ body {
     padding: 20px;
     min-width: 0;
     width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
   }
 
   .modal-body {
     min-width: 0;
+  }
+
+  .leaderboard-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

@@ -710,7 +710,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                   ⇄ Swap Players
                 </button>
               )}
-              {isAdmin && (
+              {isAdmin && !isTournamentComplete && (
                 <button className="btn-secondary" onClick={handleResetBracket}>
                   Reset Bracket
                 </button>
