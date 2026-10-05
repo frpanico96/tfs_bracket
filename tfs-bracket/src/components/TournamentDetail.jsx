@@ -6,8 +6,16 @@ import { getUserName } from "../utils/user";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
+import FinalChampionshipMatchModal from "./FinalChampionshipMatchModal";
 import BaseModal from "./BaseModal";
 import { useToast } from "../hooks/useToast";
+import {
+  isFinalChampionship,
+  generateFinalChampionshipBracket,
+  getTier,
+  TIERS,
+  TIER_LABELS,
+} from "../utils/finalChampionship";
 
 const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
 
@@ -15,7 +23,13 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const t = tournament;
   
   const isDev = import.meta.env.DEV;
+  const isFc = isFinalChampionship(t);
   const isAdmin = user?.uid && t?.adminId && user.uid === t.adminId;
+  const buildMatches = () => {
+    if (isFc) return generateFinalChampionshipBracket(t.participants, t.maxParticipants);
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    return bracketGen(t.participants, t.maxParticipants, t.defaultWinCondition || "ft3");
+  };
   const now = new Date();
   const regStartDate = parseFirestoreDate(t.regStart);
   const regEndDate = parseFirestoreDate(t.regEnd);
@@ -160,9 +174,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin) return;
     setStarting(true);
     try {
-      const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
-      const wc = t.defaultWinCondition || "ft3";
-      const matches = bracketGen(t.participants, t.maxParticipants, wc);
+      const matches = buildMatches();
+      if (matches.length === 0) {
+        addToast("At least two participants are needed to start", "error");
+        return;
+      }
       const ref = doc(db, "tournaments", t.id);
       await updateDoc(ref, { matches, started: true });
       onUpdate({ ...t, matches, started: true });
@@ -178,7 +194,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     setSelectedMatch(match);
   };
 
-  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex, dq }) => {
+  const handleSaveScore = async (match, { p1Score, p2Score, winnerIndex, dq, sets, pickBan }) => {
     if (!isAdmin) return;
     const matchIndex = t.matches.findIndex((m) => m.id === match.id);
 
@@ -196,6 +212,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       const winner = winnerIndex === 0 ? match.player1 : match.player2;
       matches = advanceBracket(t.matches, matchIndex, winnerIndex, { p1Score, p2Score });
       logEvent({ action: "record_match_score", details: { tournamentId: t.id, matchIndex, winner, round: match.round, score: `${p1Score}-${p2Score}` } });
+    }
+
+    if (isFc) {
+      matches[matchIndex].sets = sets || [];
+      matches[matchIndex].pickBan = pickBan || matches[matchIndex].pickBan || null;
     }
 
     const ref = doc(db, "tournaments", t.id);
@@ -234,8 +255,17 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     }
   };
 
+  // Final Championship: persists pick/ban and set progress without deciding the match.
+  const handleSaveFcProgress = async (match, { pickBan, sets }) => {
+    if (!isAdmin || !isFc) return;
+    const matches = t.matches.map((m) => (m.id === match.id ? { ...m, pickBan, sets } : m));
+    const ref = doc(db, "tournaments", t.id);
+    await updateDoc(ref, { matches });
+    onUpdate({ ...t, matches });
+  };
+
   const handleUpdateAllWinConditions = async (condition) => {
-    if (!isAdmin) return;
+    if (!isAdmin || isFc) return;
     const ref = doc(db, "tournaments", t.id);
     if (t.matches && t.matches.length > 0) {
       const updatedMatches = t.matches.map((match) => ({
@@ -252,7 +282,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleUpdateMatchWinCondition = async (match, condition) => {
-    if (!isAdmin) return;
+    if (!isAdmin || isFc) return;
     const matchIndex = t.matches.findIndex((m) => m.id === match.id);
     const updatedMatches = t.matches.map((m, i) =>
       i === matchIndex ? { ...m, winCondition: condition } : m
@@ -333,9 +363,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   };
 
   const handleConfirmReset = async () => {
-    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
-    const wc = t.defaultWinCondition || "ft3";
-    const freshMatches = bracketGen(t.participants, t.maxParticipants, wc);
+    if (!isAdmin) return;
+    const freshMatches = buildMatches();
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches: freshMatches });
     onUpdate({ ...t, matches: freshMatches });
@@ -348,6 +377,17 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handleSwapPlayers = async (matchId1, slot1, matchId2, slot2) => {
     if (!isAdmin) return;
+    if (isFc) {
+      const slotName = (id, slot) => {
+        const m = t.matches.find((x) => x.id === id);
+        return slot === 0 ? m?.player1 : m?.player2;
+      };
+      const tierOf = (name) => getTier(t.participants.find((p) => p.name === name));
+      if (tierOf(slotName(matchId1, slot1)) !== tierOf(slotName(matchId2, slot2))) {
+        addToast("Players can only be swapped with others of the same tier", "error");
+        return;
+      }
+    }
     const matches = swapPlayers(t.matches, matchId1, slot1, matchId2, slot2);
     if (matches === t.matches) return;
     const ref = doc(db, "tournaments", t.id);
@@ -365,6 +405,20 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handleExitSwapMode = () => {
     setSwapMode(false);
+  };
+
+  const handleSetTier = async (participant, tier) => {
+    if (!isAdmin || !isFc || t.started || !TIERS.includes(tier)) return;
+    if (getTier(participant) === tier) return;
+    const updatedParticipants = t.participants.map((p) => (p.id === participant.id ? { ...p, tier } : p));
+    try {
+      const ref = doc(db, "tournaments", t.id);
+      await updateDoc(ref, { participants: updatedParticipants });
+      onUpdate({ ...t, participants: updatedParticipants });
+      logEvent({ action: "set_participant_tier", details: { tournamentId: t.id, participantId: participant.id, tier } });
+    } catch {
+      addToast("Failed to update participant tier", "error");
+    }
   };
 
   const handleEditParticipant = (participant) => {
@@ -544,6 +598,19 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
           <p>
             <strong>Admin:</strong> {t.adminName}
           </p>
+          {isFc && (
+            <p>
+              <strong>Format:</strong> Final Championship (double elimination)
+            </p>
+          )}
+          {isFc && t.gamePool?.length > 0 && (
+            <details className="detail-game-pool">
+              <summary><strong>Game pool:</strong> {t.gamePool.length} games</summary>
+              <ul>
+                {t.gamePool.map((g) => <li key={g.id}>{g.name}</li>)}
+              </ul>
+            </details>
+          )}
           {t.game?.name && (
             <p className="detail-game-row">
               {t.game.image && <img src={t.game.image} alt="" className="detail-game-icon" />}
@@ -643,9 +710,24 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                   <li key={p.id} className="participant-item">
                     <span className="participant-name">
                       <span className="participant-num">{i + 1}.</span> {p.name}
+                      {isFc && getTier(p) !== "regular" && (
+                        <span className={`tier-badge tier-${getTier(p)}`}>{TIER_LABELS[getTier(p)]}</span>
+                      )}
                     </span>
                     {isAdmin && (
-                      <span className="participant-actions">
+                      <span className={`participant-actions${isFc ? " participant-actions-visible" : ""}`}>
+                        {isFc && (
+                          <select
+                            className="tier-select"
+                            value={getTier(p)}
+                            onChange={(e) => handleSetTier(p, e.target.value)}
+                            aria-label={`Tier for ${p.name}`}
+                          >
+                            {TIERS.map((tier) => (
+                              <option key={tier} value={tier}>{TIER_LABELS[tier]}</option>
+                            ))}
+                          </select>
+                        )}
                         <button className="btn-icon" onClick={() => handleEditParticipant(p)} title="Edit">✎</button>
                         <button className="btn-icon btn-icon-danger" onClick={() => handleRemoveParticipant(p)} title="Remove">✕</button>
                       </span>
@@ -748,6 +830,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 onMatchClick={handleMatchClick}
                 isAdmin={isAdmin}
                 bracketType={t.bracketType}
+                tournamentType={t.tournamentType}
                 onMatchWinConditionClick={(match) => setMatchWinConditionEdit(match)}
                 canSwap={canSwapPlayers}
                 onSwapPlayers={handleSwapPlayers}
@@ -794,16 +877,28 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         rankingsInfo={rankingsInfo}
         tournamentComplete={isTournamentComplete}
         onOpenRankScores={handleOpenRankScores}
+        hideWinCondition={isFc}
       />
 
-      <MatchScoreModal
-        isOpen={!!selectedMatch}
-        onClose={() => setSelectedMatch(null)}
-        match={selectedMatch}
-        onSave={handleSaveScore}
-        bracketType={t.bracketType}
-        allMatches={t.matches}
-      />
+      {isFc ? (
+        <FinalChampionshipMatchModal
+          isOpen={!!selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          match={selectedMatch ? t.matches.find((m) => m.id === selectedMatch.id) || selectedMatch : null}
+          gamePool={t.gamePool || []}
+          onSaveProgress={handleSaveFcProgress}
+          onComplete={handleSaveScore}
+        />
+      ) : (
+        <MatchScoreModal
+          isOpen={!!selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          match={selectedMatch}
+          onSave={handleSaveScore}
+          bracketType={t.bracketType}
+          allMatches={t.matches}
+        />
+      )}
 
       <BaseModal
         isOpen={!!matchWinConditionEdit}
