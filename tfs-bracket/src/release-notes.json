@@ -1,5 +1,17 @@
 [
   {
+    "version": "beta-v0.5",
+    "environment": "int",
+    "date": "2026-10-05",
+    "notes": [
+      "Final Championship: new tournament type — double elimination played over a shared pool of games chosen at creation (minimum 11)",
+      "Participant tiers: mark participants as Champion or Winner before the start; Winners enter the bracket one round and Champions two rounds after everyone else",
+      "Pick & ban flow run by the admin per match: FT2 sets up to the semifinals, FT3 in both semifinals, FT5 in the finals and grand final. Every set is a game played to 3 rounds",
+      "Progress is saved after every pick, ban and set, so a match can be resumed after a refresh; brackets show the running set score",
+      "Fixed match formats: win-condition controls are hidden for Final Championship tournaments and players can only be swapped within the same tier"
+    ]
+  },
+  {
     "version": "beta-v0.4.2",
     "environment": "int",
     "date": "2026-07-07",

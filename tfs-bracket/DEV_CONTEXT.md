@@ -374,3 +374,50 @@ match /invites/{inviteId} {
   allow update: if request.auth != null;
 }
 ```
+
+## Iteration 10: Final Championship
+
+### Feature
+A second tournament type, `tournamentType: "final_championship"` (absent on standard tournaments). It is always double elimination and is played over a **pool of games** instead of a single game. Everything is **admin-driven**: the admin runs the pick/ban for both players and records the set scores (no player ownership or live sync).
+
+- **Creation**: `CreateTournament` has a Standard / Final Championship toggle. For Final Championship the bracket-type toggle and single-game picker are replaced by `GamePoolPicker` (reuses `GamePicker`, appends each pick as a removable chip). Minimum pool: 11 games (`MIN_POOL_SIZE`).
+- **Tiers**: participants carry `tier: "regular" | "winner" | "champion"` (missing = regular). The admin sets it from the participant list before the bracket starts. Winners enter the winners bracket one round after the regulars, Champions two rounds after. Any number of each.
+- **Formats** (`PHASE_FORMAT`): matches before the semifinals are FT2 sets, both semifinals FT3, Winners Final / Losers Final / Grand Final / Grand Final Reset FT5. Each *set* is one game title played to 3 rounds (`SET_FT`). `winCondition` holds the match format (`ft2|ft3|ft5`), so `advanceBracket` and the rankings work unchanged: `scoreP1/scoreP2` are **sets won**.
+- **Pick/ban templates** (admin acts for player1 / player2 in turn; the decider is automatic and random from what is left):
+  - FT2: ban, ban, pick, pick, ban, ban, decider (3 games max)
+  - FT3: ban, ban, pick, pick, ban, ban, pick, pick, decider (5 games max)
+  - FT5: pick, pick, ban, ban, pick, pick, pick, pick, pick, pick, decider (9 games max; with an 11-game pool the decider is the last game left)
+  - Games are played in pick order, the decider last. The pool resets for every match (including the Grand Final Reset).
+- **Match flow**: `FinalChampionshipMatchModal` (pick/ban wizard with undo, then per-set score entry, DQ). Progress (`pickBan`, `sets`) is saved to Firestore after each step via `handleSaveFcProgress`, so a match can be resumed; the match is only decided (and `advanceBracket` called through `handleSaveScore`) when a player reaches the set target.
+
+### Data model additions
+```
+tournaments/{id}:
+  tournamentType: "final_championship"        # only on Final Championship
+  gamePool: array<{ id, name, image }>
+  participants[].tier: "regular" | "winner" | "champion"
+  matches[].phase: "general" | "semi" | "final"
+  matches[].winCondition: "ft2" | "ft3" | "ft5"   # fixed per phase
+  matches[].setFt: 3
+  matches[].pickBan: null | { template, pool: [{id,name}], steps: [{ action: "ban"|"pick"|"decider", player: 0|1|null, game }] }
+  matches[].sets: array<{ game, scoreP1, scoreP2, winner: 0|1 }>
+```
+No `firestore.rules` changes were needed (`bracketType` is `double`, tier changes are admin participant updates, and a full 64-player bracket with sets stays around 160 KB).
+
+### Bracket generation (`src/utils/finalChampionship.js`)
+- `generateFinalChampionshipBracket(participants, max, rng)`: builds the winners bracket level by level. Level 1 pairs the regulars, level 2 adds the Winners to the survivors, level 3 adds the Champions. Known entrants face undecided winners first so same-tier players do not meet early. If a level has an odd number of entrants one undecided winner skips a round, so **no BYE placeholders** are used.
+- `buildLosersAndGrandFinal(wbMatches, wc)`: losers bracket for an arbitrary winners-bracket shape (consolidate survivors, then cross with the incoming losers; odd leftovers skip a round by a direct link). It is separate from the standard generator, which is untouched.
+- Every non-champion ends with exactly two losses; this is covered by a simulation over 633 tier mixes (1,899 played-out tournaments).
+
+### Rankings
+`computeRankings(..., options)` accepts `{ rankByLosersExit: true }`, used only for Final Championship. A player is placed by the losers-bracket match that eliminated them. The default logic compares the highest round number across both brackets, which only works for the standard bracket shape and misorders players in the Final Championship one. Standard tournaments keep the original behaviour.
+- Known, unchanged behaviour in standard double elimination: players knocked out in the same losers round can end up with different ranks (and therefore different points) because of that tie-break. Left as is on purpose; changing it alters points for existing tournaments.
+
+### Other changes
+- `TournamentDetail.jsx`: tier selector + badges, FC start/reset, FC modal, swap limited to players of the same tier, win-condition handlers disabled for FC, game pool shown in the info block.
+- `BracketView.jsx` / `PublicBracketView.jsx`: phase round names (Winners Semifinal, Losers Final, ...), fixed (non-clickable) format labels, live set score for matches in progress.
+- `TournamentSidebar.jsx`: `hideWinCondition` replaces the default win-condition control for FC.
+- Known limitation: a player joining while registration is open writes the participants array from their own copy, so tiers should be set once registration is closed (same pre-existing behaviour as other participant edits).
+
+### Tests
+Suite total: 240 tests across 19 files (180 before this iteration). New files: `finalChampionship.test.js` (engine, simulation, rankings, full flow), `FinalChampionshipMatchModal.test.jsx`, `GamePoolPicker.test.jsx`, `CreateTournamentFC.test.jsx`, `BracketViewFC.test.jsx`, `TournamentDetailFC.test.jsx`.

@@ -9,6 +9,7 @@ Built for **Team Fight Series (TFS)** — a community fighting game tournament o
 ## Features
 
 - **Single & Double Elimination** — Generate brackets, support odd players, grand final reset
+- **Final Championship** — Double elimination over a pool of games with admin-run picks and bans (FT2 / FT3 / FT5 sets), where Winners and Champions enter the bracket one and two rounds later
 - **Real-time Scoring** — Record match scores with a compact modal; DQ support
 - **Role-based Access** — Super Admin, Tournament Admin, and Player roles
 - **Invite-only UAT** — Secure invite system with email invites and shareable invite links
@@ -141,10 +142,16 @@ All bracket logic lives in `src/utils/bracket.js`:
 - `swapPlayers` — Swap players between unfilled match slots
 - `getMatchRoundName` — Human-readable round names
 
+Final Championship logic lives in `src/utils/finalChampionship.js`:
+- `generateFinalChampionshipBracket` — Tier-aware double elimination bracket (Winners enter round 2, Champions round 3)
+- `initPickBan` / `applyPickBanStep` / `undoPickBanStep` — Pick/ban engine for the FT2, FT3 and FT5 templates
+- `appendSet` / `getMatchProgress` — Per-set scoring (each set is one game to 3 rounds)
+
 ### Data model
 
 **Tournament** (`tournaments/{id}`):
-- `name`, `adminId`, `type` (single/double), `participants[]`
+- `name`, `adminId`, `bracketType` (single/double), `participants[]`
+- Final Championship only: `tournamentType: "final_championship"`, `gamePool[]`, and `tier` (regular|winner|champion) on each participant
 - `matches[]`, `started`, `published`, `completed`
 - `rankScores[]` — custom points per finishing rank
 - `scoresAssigned` — flag to prevent duplicate score assignment
