@@ -24,15 +24,9 @@ export default function GamePoolPicker({ value, onChange }) {
           {pool.map((g) => (
             <li key={g.id} className="game-pool-chip">
               {g.image && <img src={g.image} alt="" className="game-pool-thumb" />}
-              <span>{g.name}</span>
-              <button
-                type="button"
-                className="game-pool-remove"
-                onClick={() => handleRemove(g.id)}
-                aria-label={`Remove ${g.name}`}
-              >
-                ×
-              </button>
+              <span onClick={() => handleRemove(g.id)}>
+                {g.name}
+              </span>
             </li>
           ))}
         </ul>
