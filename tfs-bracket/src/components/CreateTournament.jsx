@@ -8,6 +8,8 @@ import { logEvent } from "../utils/logger";
 import { getUserName } from "../utils/user";
 import { useToast } from "../hooks/useToast";
 import GamePicker from "./GamePicker";
+import GamePoolPicker from "./GamePoolPicker";
+import { TOURNAMENT_TYPE_FC, MIN_POOL_SIZE } from "../utils/finalChampionship";
 
 export default function CreateTournament({ user, onCancel, onCreated }) {
   const [name, setName] = useState("");
@@ -16,6 +18,9 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
   const [regEnd, setRegEnd] = useState("");
   const [bracketType, setBracketType] = useState("single");
   const [game, setGame] = useState(null);
+  const [tournamentType, setTournamentType] = useState("standard");
+  const [gamePool, setGamePool] = useState([]);
+  const isFc = tournamentType === TOURNAMENT_TYPE_FC;
   const [imageUrl, setImageUrl] = useState("");
   const [description, setDescription] = useState("");
   const [twitchUrl, setTwitchUrl] = useState("");
@@ -34,6 +39,9 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
     if (regStart && regEnd && new Date(regEnd) <= new Date(regStart)) {
       errs.regEnd = "End must be after start";
     }
+    if (isFc && gamePool.length < MIN_POOL_SIZE) {
+      errs.gamePool = `The game pool needs at least ${MIN_POOL_SIZE} games`;
+    }
     if (twitchUrl && !twitchUrl.match(/^https?:\/\/(www\.)?twitch\.tv\//i)) {
       errs.twitchUrl = "Must be a valid Twitch URL (https://twitch.tv/...)";
     }
@@ -47,26 +55,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
     setCreating(true);
     try {
       const maxP = parseInt(maxParticipants);
-      const docRef = await addDoc(tournamentsRef, {
-        name: name.trim(),
-        maxParticipants: maxP,
-        regStart: new Date(regStart),
-        regEnd: new Date(regEnd),
-        createdAt: serverTimestamp(),
-        adminId: user.uid,
-        adminName: getUserName(user),
-        published: false,
-        started: false,
-        bracketType,
-        participants: [],
-        matches: [],
-        game: game || null,
-        imageUrl: imageUrl.trim() || null,
-        description: description.trim() || null,
-        twitchUrl: twitchUrl.trim() || null,
-      });
-      onCreated({
-        id: docRef.id,
+      const data = {
         name: name.trim(),
         maxParticipants: maxP,
         regStart: new Date(regStart),
@@ -75,14 +64,17 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
         adminName: getUserName(user),
         published: false,
         started: false,
-        bracketType,
+        bracketType: isFc ? "double" : bracketType,
         participants: [],
         matches: [],
-        game: game || null,
+        game: isFc ? null : game || null,
         imageUrl: imageUrl.trim() || null,
         description: description.trim() || null,
         twitchUrl: twitchUrl.trim() || null,
-      });
+        ...(isFc ? { tournamentType: TOURNAMENT_TYPE_FC, gamePool } : {}),
+      };
+      const docRef = await addDoc(tournamentsRef, { ...data, createdAt: serverTimestamp() });
+      onCreated({ id: docRef.id, ...data });
       logEvent({ action: "create_tournament", details: { tournamentId: docRef.id, name, adminId: user.uid } });
     } catch (error) {
       console.error("Create failed:", error);
@@ -120,6 +112,31 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
           {errors.maxParticipants && <span className="field-error">{errors.maxParticipants}</span>}
         </label>
         <label>
+          Tournament Type
+          <div className="bracket-type-toggle">
+            <button
+              type="button"
+              className={`bracket-type-btn ${!isFc ? "selected" : ""}`}
+              onClick={() => setTournamentType("standard")}
+            >
+              Standard
+            </button>
+            <button
+              type="button"
+              className={`bracket-type-btn ${isFc ? "selected" : ""}`}
+              onClick={() => setTournamentType(TOURNAMENT_TYPE_FC)}
+            >
+              Final Championship
+            </button>
+          </div>
+        </label>
+        {isFc ? (
+          <p className="field-hint">
+            Double elimination with a shared game pool. Champions enter two rounds and Winners one
+            round after the other participants. Matches use picks and bans from the pool.
+          </p>
+        ) : (
+        <label>
           Bracket Type
           <div className="bracket-type-toggle">
             <button
@@ -138,6 +155,7 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
             </button>
           </div>
         </label>
+        )}
         <label className={errors.regStart ? "field-invalid" : ""}>
           Registration Start
           <input
@@ -158,10 +176,18 @@ export default function CreateTournament({ user, onCancel, onCreated }) {
           />
           {errors.regEnd && <span className="field-error">{errors.regEnd}</span>}
         </label>
-        <label>
-          Game
-          <GamePicker value={game} onChange={setGame} />
-        </label>
+        {isFc ? (
+          <label className={errors.gamePool ? "field-invalid" : ""}>
+            Game Pool
+            <GamePoolPicker value={gamePool} onChange={(p) => { setGamePool(p); if (errors.gamePool) setErrors((prev) => ({ ...prev, gamePool: "" })); }} />
+            {errors.gamePool && <span className="field-error">{errors.gamePool}</span>}
+          </label>
+        ) : (
+          <label>
+            Game
+            <GamePicker value={game} onChange={setGame} />
+          </label>
+        )}
         <label>
           Tournament Image URL
           <input

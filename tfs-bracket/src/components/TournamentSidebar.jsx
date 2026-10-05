@@ -49,7 +49,7 @@ function RankingsList({ rankings }) {
   );
 }
 
-export default function TournamentSidebar({ isOpen, onToggle, currentCondition, onUpdateCondition, isDev, swapQuickMode, onSwapQuickModeToggle, isAdmin, rankings, rankingsLoading, rankingsInfo, tournamentComplete, onOpenRankScores }) {
+export default function TournamentSidebar({ isOpen, onToggle, currentCondition, onUpdateCondition, isDev, swapQuickMode, onSwapQuickModeToggle, isAdmin, rankings, rankingsLoading, rankingsInfo, tournamentComplete, onOpenRankScores, hideWinCondition }) {
   const [isConditionModalOpen, setIsConditionModalOpen] = useState(false);
 
   return (
@@ -67,6 +67,10 @@ export default function TournamentSidebar({ isOpen, onToggle, currentCondition, 
                   <span className="sidebar-section-icon">⚙️</span>
                   Tournament Settings
                 </h4>
+                {hideWinCondition ? (
+                  <p className="sidebar-hint">Match formats are fixed: FT2 sets, FT3 in semifinals, FT5 in finals.</p>
+                ) : (
+                <>
                 <div className="sidebar-current">
                   <span>Default Win Condition:</span>
                   <button
@@ -80,6 +84,8 @@ export default function TournamentSidebar({ isOpen, onToggle, currentCondition, 
                 <p className="sidebar-hint">
                   {tournamentComplete ? "Locked after tournament completion" : "Click to change the win condition for all matches"}
                 </p>
+                </>
+                )}
                 <div className="sidebar-current">
                   <span>Tournament Scores:</span>
                   <button

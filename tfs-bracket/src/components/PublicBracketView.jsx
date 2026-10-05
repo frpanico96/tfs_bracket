@@ -75,6 +75,7 @@ export default function PublicBracketView({ token }) {
           onMatchClick={() => {}}
           isAdmin={false}
           bracketType={tournament.bracketType}
+          tournamentType={tournament.tournamentType}
           onMatchWinConditionClick={() => {}}
           canSwap={false}
           onSwapPlayers={() => {}}
