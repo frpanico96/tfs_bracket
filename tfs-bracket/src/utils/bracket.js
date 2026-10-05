@@ -809,7 +809,7 @@ function computeSingleElimRankings(allMatches, rankScores) {
   return result;
 }
 
-function computeDoubleElimRankings(allMatches, rankScores) {
+function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = false) {
   const gfM0 = allMatches.find(m => m.id === 'gf-m0');
   const gfM1 = allMatches.find(m => m.id === 'gf-m1');
 
@@ -886,14 +886,19 @@ function computeDoubleElimRankings(allMatches, rankScores) {
   for (const player of allPlayers) {
     if (ranked.has(player)) continue;
     let lastLoss = null;
+    let losersLoss = null;
     for (const m of allMatches) {
       if (m.winner == null) continue;
       const loser = m.winner === 0 ? m.player2 : m.player1;
-      if (loser === player && (!lastLoss || m.round > lastLoss.round)) {
-        lastLoss = m;
-      }
+      if (loser !== player) continue;
+      if (!lastLoss || m.round > lastLoss.round) lastLoss = m;
+      if (m.bracket === 'losers') losersLoss = m;
     }
-    if (lastLoss) remaining.push({ player, loss: lastLoss });
+    // Opt-in (Final Championship): a player is knocked out by a losers-bracket loss, and
+    // round numbers of the two brackets are not comparable, so rank by that loss instead
+    // of "highest round". Standard tournaments keep the original behaviour.
+    const eliminatingLoss = rankByLosersExit ? (losersLoss || lastLoss) : lastLoss;
+    if (eliminatingLoss) remaining.push({ player, loss: eliminatingLoss });
   }
 
   const bracketOrder = { grandFinal: 0, winners: 1, losers: 2 };
@@ -927,7 +932,7 @@ function computeDoubleElimRankings(allMatches, rankScores) {
   return result;
 }
 
-export function computeRankings(matches, bracketType, rankScores, participants) {
+export function computeRankings(matches, bracketType, rankScores, participants, options = {}) {
   if (!matches || matches.length === 0) return [];
 
   const hasPlayedMatches = matches.some(m => m.winner != null && m.isPlayed);
@@ -942,7 +947,7 @@ export function computeRankings(matches, bracketType, rankScores, participants) 
 
   let rankings;
   if (bracketType === 'double') {
-    rankings = computeDoubleElimRankings(matches, rankScores);
+    rankings = computeDoubleElimRankings(matches, rankScores, options.rankByLosersExit === true);
   } else {
     rankings = computeSingleElimRankings(matches, rankScores);
   }

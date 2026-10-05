@@ -166,7 +166,7 @@ describe("generateFinalChampionshipBracket", () => {
           if (expected) expect(result.losses[p.name] || 0, `${label} ${p.name}`).toBe(2);
           else expect(result.losses[p.name] || 0, `${label} champion`).toBeLessThanOrEqual(1);
         }
-        const ranks = computeRankings(result.matches, "double", null, players);
+        const ranks = computeRankings(result.matches, "double", null, players, { rankByLosersExit: true });
         expect(ranks[0]?.players[0]?.name, label).toBe(champ);
         const ranked = ranks.flatMap((e) => e.players.map((q) => q.name));
         expect(new Set(ranked).size, label).toBe(players.length);
@@ -315,5 +315,127 @@ describe("sets", () => {
   it("refuses sets before pick/ban is complete", () => {
     const m = { winCondition: "ft2", pickBan: initPickBan("ft2", pool), sets: [] };
     expect(() => appendSet(m, 3, 0)).toThrow();
+  });
+});
+
+// ── Rankings ────────────────────────────────────────────────
+
+describe("rankings for the Final Championship bracket", () => {
+  // Plays with random winners and records the round in which each player took a
+  // second loss, which is the ground truth for their final placement.
+  function playRecordingExits(players, rng) {
+    let matches = generateFinalChampionshipBracket(players, 64, rng);
+    const losses = {};
+    const exitRound = {};
+    for (let guard = 0; guard < 2000; guard++) {
+      const active = matches.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD"));
+      if (active.every((m) => m.winner != null)) return { matches, exitRound };
+      const idx = matches.findIndex((m) => m.winner == null && real(m.player1) && real(m.player2));
+      if (idx === -1) throw new Error("stuck");
+      const m = matches[idx];
+      const w = rng() < 0.5 ? 0 : 1;
+      const loser = w === 0 ? m.player2 : m.player1;
+      losses[loser] = (losses[loser] || 0) + 1;
+      if (losses[loser] === 2) exitRound[loser] = m.bracket === "grandFinal" ? Infinity : m.round;
+      matches = advanceBracket(matches, idx, w, { p1Score: w === 0 ? 2 : 0, p2Score: w === 1 ? 2 : 0 });
+    }
+    throw new Error("guard");
+  }
+
+  it("never ranks a player who went out in an earlier losers round above one who went out later", () => {
+    const configs = [[3, 3, 3], [3, 3, 0], [0, 3, 3], [7, 2, 1], [16, 4, 2], [30, 5, 3], [51, 9, 4], [1, 0, 3], [5, 5, 5]];
+    for (const [r, w, c] of configs) {
+      for (let seed = 1; seed <= 25; seed++) {
+        const players = makePlayers(r, w, c);
+        const { matches, exitRound } = playRecordingExits(players, seeded(seed * 31 + r));
+        const ranks = computeRankings(matches, "double", null, players, { rankByLosersExit: true });
+        const rankOf = {};
+        ranks.forEach((e) => e.players.forEach((p) => { rankOf[p.name] = e.rank; }));
+        const names = Object.keys(exitRound);
+        for (const a of names) {
+          for (const b of names) {
+            if (exitRound[a] > exitRound[b]) {
+              expect(rankOf[a], `R=${r} W=${w} C=${c} seed=${seed}: ${a} vs ${b}`).toBeLessThanOrEqual(rankOf[b]);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("leaves the default ranking behaviour untouched when the option is not set", () => {
+    const players = makePlayers(6, 0, 0);
+    const { matches } = playRecordingExits(players, seeded(9));
+    expect(computeRankings(matches, "double", null, players)).toEqual(
+      computeRankings(matches, "double", null, players, {})
+    );
+  });
+});
+
+// ── Full match flow (same path the admin UI takes) ──────────
+
+describe("full tournament through pick/ban, sets and bracket advancement", () => {
+  const pool = Array.from({ length: 11 }, (_, i) => ({ id: `g${i}`, name: `Game ${i}` }));
+
+  function hasUndefined(value) {
+    if (value === undefined) return true;
+    if (value && typeof value === "object") return Object.values(value).some(hasUndefined);
+    return false;
+  }
+
+  function playFullFlow(players, rng) {
+    let matches = generateFinalChampionshipBracket(players, 64, rng);
+    const maxGames = { ft2: 0, ft3: 0, ft5: 0 };
+    for (let guard = 0; guard < 2000; guard++) {
+      const active = matches.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD"));
+      if (active.every((m) => m.winner != null)) return { matches, maxGames };
+      const idx = matches.findIndex((m) => m.winner == null && real(m.player1) && real(m.player2));
+      if (idx === -1) throw new Error("stuck");
+      const m = matches[idx];
+
+      let pb = initPickBan(m.winCondition, pool);
+      while (getNextAction(pb)) {
+        const remaining = getRemainingGames(pb);
+        pb = applyPickBanStep(pb, remaining[Math.floor(rng() * remaining.length)].id, rng);
+      }
+      let current = { ...m, pickBan: pb, sets: [] };
+      while (!getMatchProgress(current).decided) {
+        const winner = rng() < 0.5 ? 0 : 1;
+        const other = Math.floor(rng() * 3);
+        current = { ...current, sets: appendSet(current, winner === 0 ? 3 : other, winner === 1 ? 3 : other) };
+      }
+      maxGames[m.winCondition] = Math.max(maxGames[m.winCondition], current.sets.length);
+      const progress = getMatchProgress(current);
+      matches = advanceBracket(matches, idx, progress.winnerIndex, { p1Score: progress.p1Sets, p2Score: progress.p2Sets });
+      matches[idx].sets = current.sets;
+      matches[idx].pickBan = current.pickBan;
+    }
+    throw new Error("guard");
+  }
+
+  it("completes with every format capped at its maximum number of games", () => {
+    let seenFt5 = 0;
+    for (const [r, w, c] of [[16, 4, 2], [7, 2, 1], [30, 5, 3], [0, 4, 4]]) {
+      for (let seed = 1; seed <= 10; seed++) {
+        const { matches, maxGames } = playFullFlow(makePlayers(r, w, c), seeded(seed * 13 + r));
+        expect(maxGames.ft2).toBeLessThanOrEqual(3);
+        expect(maxGames.ft3).toBeLessThanOrEqual(5);
+        expect(maxGames.ft5).toBeLessThanOrEqual(9);
+        for (const m of matches) {
+          if (m.isPlayed && m.sets.length > 0) {
+            expect(m.scoreP1 === getSetTarget(m.winCondition) || m.scoreP2 === getSetTarget(m.winCondition)).toBe(true);
+            expect(m.sets.every((s) => s.scoreP1 === 3 || s.scoreP2 === 3)).toBe(true);
+            if (m.winCondition === "ft5") seenFt5++;
+          }
+        }
+      }
+    }
+    expect(seenFt5).toBeGreaterThan(0);
+  });
+
+  it("produces data Firestore accepts (no undefined values) and stays far below the 1 MB limit", () => {
+    const { matches } = playFullFlow(makePlayers(51, 9, 4), seeded(77));
+    expect(hasUndefined(matches)).toBe(false);
+    expect(JSON.stringify(matches).length).toBeLessThan(400 * 1024);
   });
 });

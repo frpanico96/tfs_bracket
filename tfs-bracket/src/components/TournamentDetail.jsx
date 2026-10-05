@@ -73,8 +73,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const addToast = useToast();
 
   const rawRankings = useMemo(
-    () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
-    [t.matches, t.bracketType, t.rankScores, t.participants]
+    () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants, { rankByLosersExit: isFc }) : [],
+    [t.matches, t.bracketType, t.rankScores, t.participants, isFc]
   );
 
   const [rankingsReady, setRankingsReady] = useState(false);
@@ -227,7 +227,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     const activeMatches = updatedTournament.matches.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD"));
     const allDone = activeMatches.length > 0 && activeMatches.every((m) => m.winner != null);
     if (allDone && !t.scoresAssigned) {
-      const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants);
+      const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants, { rankByLosersExit: isFc });
       if (!t.rankScores) {
         console.warn("Awarding scores: no rankScores configured, all points will be 0");
       }
