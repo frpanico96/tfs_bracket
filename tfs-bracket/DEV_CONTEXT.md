@@ -421,3 +421,21 @@ No `firestore.rules` changes were needed (`bracketType` is `double`, tier change
 
 ### Tests
 Suite total: 240 tests across 19 files (180 before this iteration). New files: `finalChampionship.test.js` (engine, simulation, rankings, full flow), `FinalChampionshipMatchModal.test.jsx`, `GamePoolPicker.test.jsx`, `CreateTournamentFC.test.jsx`, `BracketViewFC.test.jsx`, `TournamentDetailFC.test.jsx`.
+
+## Iteration 11: Maintainability pass
+
+### Done (behaviour-preserving)
+- `utils/participants.js`: `addNames` / `removeName` / `renameName` replace seven hand-written copies of the `participantNameSet` bookkeeping in `TournamentDetail.jsx`.
+- `bracket.js`: removed the unreachable "drop loser into losers bracket" blocks in `propagateInitialByes` (only BYE matches are played at generation, so their loser is always `"BYE"`). Verified: 0 calls over field sizes 2-64 and byte-identical output for 504 generated brackets (single + double, seeded).
+- `finalChampionship.js`: `canSwapSlots` holds the same-tier swap rule (was inline in the 1100-line component), unit-tested.
+- `App.jsx`: `Leaderboard`, `PublicRegistration` and `PublicBracketView` are lazy-loaded. Main chunk 660 kB -> 293 kB (firebase split into its own 363 kB chunk).
+- CI: also runs on PRs to `develop` and now runs `npm run build`.
+- Tests: standard double-elimination playthrough for every field size 2-64, helpers, `canSwapSlots`.
+
+### Backlog (not done on purpose, needs a decision or Firebase emulator)
+1. **Lost updates**: every match save writes the whole `matches[]` from the client copy. Two admins (or two tabs) scoring different matches overwrite each other. Fix: `runTransaction` re-reading the doc, or one doc per match in a subcollection (also removes the 1 MiB / 3000-key ceiling).
+2. **Rules trust the client**: `firestore.rules` does not validate `matches` shape, so any admin client can write a bracket that violates the game rules. Add shape checks or move scoring into a Cloud Function.
+3. **`TournamentDetail.jsx` is ~1100 lines** with ~30 handlers mixing Firestore writes, validation and UI. Next step: a `useTournamentActions(t, user)` hook so handlers are testable without rendering.
+4. **`App.css` is a single ~3000-line file**; consider CSS modules per component.
+5. **Docs drift** (`DEV_CONTEXT.md` test counts, README) - generate counts in CI instead of hand-editing.
+6. Standard double-elim ranking splits same-round losers (see Iteration 10); product decision.

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, setDoc, deleteDoc, serverTimestamp, registrationTokensRef, registrationEntriesRef, bracketTokensRef, query, where, onSnapshot } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { logEvent } from "../utils/logger";
+import { addNames, removeName, renameName } from "../utils/participants";
 import { getUserName } from "../utils/user";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
@@ -13,6 +14,7 @@ import {
   isFinalChampionship,
   generateFinalChampionshipBracket,
   getTier,
+  canSwapSlots,
   TIERS,
   TIER_LABELS,
 } from "../utils/finalChampionship";
@@ -136,7 +138,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       const ref = doc(db, "tournaments", t.id);
       const name = getUserName(user);
       const newParticipant = { id: user.uid, name, email: user.email };
-      const nameSet = { ...(t.participantNameSet || {}), [name.toLowerCase()]: true };
+      const nameSet = addNames(t.participantNameSet, name);
       await updateDoc(ref, {
         participants: [...t.participants, newParticipant],
         participantNameSet: nameSet,
@@ -298,7 +300,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     const ref = doc(db, "tournaments", t.id);
     const effectiveName = regUser.display_name || regUser.name;
     const newParticipant = { id: regUser.id, name: effectiveName, email: regUser.email || "" };
-    const nameSet = { ...(t.participantNameSet || {}), [effectiveName.toLowerCase()]: true };
+    const nameSet = addNames(t.participantNameSet, effectiveName);
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
       participantNameSet: nameSet,
@@ -316,7 +318,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (t.participants.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
     const userDoc = await addDoc(usersRef, { name, provider: "manual", role: "player", createdAt: serverTimestamp() });
     const newParticipant = { id: userDoc.id, name, email: "" };
-    const nameSet = { ...(t.participantNameSet || {}), [name.toLowerCase()]: true };
+    const nameSet = addNames(t.participantNameSet, name);
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, newParticipant],
@@ -346,8 +348,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         email: `player${num}@example.com`,
       };
     });
-    const nameSet = { ...(t.participantNameSet || {}) };
-    toAdd.forEach((p) => { nameSet[p.name.toLowerCase()] = true; });
+    const nameSet = addNames(t.participantNameSet, toAdd.map((p) => p.name));
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, {
       participants: [...t.participants, ...toAdd],
@@ -377,16 +378,9 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handleSwapPlayers = async (matchId1, slot1, matchId2, slot2) => {
     if (!isAdmin) return;
-    if (isFc) {
-      const slotName = (id, slot) => {
-        const m = t.matches.find((x) => x.id === id);
-        return slot === 0 ? m?.player1 : m?.player2;
-      };
-      const tierOf = (name) => getTier(t.participants.find((p) => p.name === name));
-      if (tierOf(slotName(matchId1, slot1)) !== tierOf(slotName(matchId2, slot2))) {
-        addToast("Players can only be swapped with others of the same tier", "error");
-        return;
-      }
+    if (isFc && !canSwapSlots(t.matches, t.participants, matchId1, slot1, matchId2, slot2)) {
+      addToast("Players can only be swapped with others of the same tier", "error");
+      return;
     }
     const matches = swapPlayers(t.matches, matchId1, slot1, matchId2, slot2);
     if (matches === t.matches) return;
@@ -432,9 +426,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin || !editParticipant) return;
     const name = editParticipantName.trim();
     if (!name) return;
-    const nameSet = { ...(t.participantNameSet || {}) };
-    delete nameSet[editParticipant.name.toLowerCase()];
-    nameSet[name.toLowerCase()] = true;
+    const nameSet = renameName(t.participantNameSet, editParticipant.name, name);
     const updatedParticipants = t.participants.map((p) =>
       p.id === editParticipant.id ? { ...p, name, email: editParticipantEmail.trim() || p.email } : p
     );
@@ -455,8 +447,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const handleConfirmRemove = async () => {
     if (!showRemoveConfirm) return;
     const updatedParticipants = t.participants.filter((p) => p.id !== showRemoveConfirm.id);
-    const nameSet = { ...(t.participantNameSet || {}) };
-    delete nameSet[showRemoveConfirm.name.toLowerCase()];
+    const nameSet = removeName(t.participantNameSet, showRemoveConfirm.name);
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { participants: updatedParticipants, participantNameSet: nameSet });
     onUpdate({ ...t, participants: updatedParticipants, participantNameSet: nameSet });
@@ -552,7 +543,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         const userDocRef = await addDoc(usersRef, { name: entry.name, provider: "manual", role: "player", createdAt: serverTimestamp() });
         newParticipant = { id: userDocRef.id, name: entry.name, email: "" };
       }
-      const nameSet = { ...(t.participantNameSet || {}), [entry.name.toLowerCase()]: true };
+      const nameSet = addNames(t.participantNameSet, entry.name);
       const ref = doc(db, "tournaments", t.id);
       await updateDoc(ref, {
         participants: [...(t.participants || []), newParticipant],

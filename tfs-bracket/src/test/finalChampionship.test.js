@@ -17,6 +17,7 @@ import {
   getFcRoundName,
   getTier,
   getSetTarget,
+  canSwapSlots,
 } from "../utils/finalChampionship";
 
 function seeded(seed) {
@@ -437,5 +438,24 @@ describe("full tournament through pick/ban, sets and bracket advancement", () =>
     const { matches } = playFullFlow(makePlayers(51, 9, 4), seeded(77));
     expect(hasUndefined(matches)).toBe(false);
     expect(JSON.stringify(matches).length).toBeLessThan(400 * 1024);
+  });
+});
+
+describe("canSwapSlots", () => {
+  const people = [
+    { name: "A", tier: "regular" }, { name: "B", tier: "regular" },
+    { name: "C", tier: "winner" }, { name: "D", tier: "champion" },
+  ];
+  const ms = [
+    { id: "m1", player1: "A", player2: "C" },
+    { id: "m2", player1: "B", player2: "D" },
+  ];
+  it("allows same tier and refuses different tiers", () => {
+    expect(canSwapSlots(ms, people, "m1", 0, "m2", 0)).toBe(true);
+    expect(canSwapSlots(ms, people, "m1", 0, "m1", 1)).toBe(false);
+    expect(canSwapSlots(ms, people, "m1", 1, "m2", 1)).toBe(false);
+  });
+  it("treats unknown players as regular", () => {
+    expect(canSwapSlots([{ id: "x", player1: "Z", player2: "A" }], people, "x", 0, "x", 1)).toBe(true);
   });
 });

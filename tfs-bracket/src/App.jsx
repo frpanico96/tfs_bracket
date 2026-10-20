@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useToast } from "./hooks/useToast";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -20,7 +20,7 @@ import Header from "./components/Header";
 import TournamentList from "./components/TournamentList";
 import CreateTournament from "./components/CreateTournament";
 import TournamentDetail from "./components/TournamentDetail";
-import Leaderboard from "./components/Leaderboard";
+const Leaderboard = lazy(() => import("./components/Leaderboard"));
 import InviteModal from "./components/InviteModal";
 import ReleaseNotes from "./components/ReleaseNotes";
 import VersionBadges from "./components/VersionBadges";
@@ -28,8 +28,9 @@ import RestrictedAccess from "./components/RestrictedAccess";
 import SetDisplayName from "./components/SetDisplayName";
 import BaseModal from "./components/BaseModal";
 import useUserRole from "./hooks/useUserRole";
-import PublicRegistration from "./components/PublicRegistration";
-import PublicBracketView from "./components/PublicBracketView";
+// Rarely-used entry points are split out of the main bundle.
+const PublicRegistration = lazy(() => import("./components/PublicRegistration"));
+const PublicBracketView = lazy(() => import("./components/PublicBracketView"));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -190,11 +191,11 @@ function App() {
   const bracketToken = new URLSearchParams(window.location.search).get("bracket");
 
   if (regToken) {
-    return <PublicRegistration token={regToken} />;
+    return <Suspense fallback={null}><PublicRegistration token={regToken} /></Suspense>;
   }
 
   if (bracketToken) {
-    return <PublicBracketView token={bracketToken} />;
+    return <Suspense fallback={null}><PublicBracketView token={bracketToken} /></Suspense>;
   }
 
   if (!authReady) {
@@ -324,7 +325,7 @@ function App() {
             />
           )}
           {view === "leaderboard" && (
-            <Leaderboard />
+            <Suspense fallback={null}><Leaderboard /></Suspense>
           )}
         </div>
       </main>

@@ -446,6 +446,9 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
   return matches;
 }
 
+// Resolves BYE-only matches at generation time and walks the winners forward.
+// Only BYE matches are played at this point, so their loser is always "BYE" and
+// there is nothing to drop into the losers bracket.
 function propagateInitialByes(matches) {
   const wbMatches = matches.filter(m => m.bracket === 'winners');
 
@@ -453,25 +456,6 @@ function propagateInitialByes(matches) {
     if (match.isPlayed && match.winner !== null) {
       let currentId = match.id;
       let currentWinner = match.winner === 0 ? match.player1 : match.player2;
-
-      if (match.loserGoesTo) {
-        const loser = match.winner === 0 ? match.player2 : match.player1;
-        if (loser !== "BYE") {
-          const lbMatch = matches.find(m => m.id === match.loserGoesTo);
-          if (lbMatch) {
-            if (lbMatch.prevMatch1 != null || lbMatch.prevMatch2 != null) {
-              lbMatch.player2 = loser;
-            } else {
-              if (lbMatch.player1 === "TBD" || !lbMatch.player1) {
-                lbMatch.player1 = loser;
-              } else if (lbMatch.player2 === "TBD" || !lbMatch.player2) {
-                lbMatch.player2 = loser;
-              }
-            }
-            propagateLbBye(matches, lbMatch, null);
-          }
-        }
-      }
 
       while (true) {
         const next = matches.find(m =>
@@ -494,23 +478,6 @@ function propagateInitialByes(matches) {
         next.isPlayed = true;
         currentWinner = next.winner === 0 ? next.player1 : next.player2;
         currentId = next.id;
-
-        const nextLoser = next.winner === 0 ? next.player2 : next.player1;
-        if (next.loserGoesTo && nextLoser !== "BYE") {
-          const lbMatch2 = matches.find(m => m.id === next.loserGoesTo);
-          if (lbMatch2) {
-            if (lbMatch2.prevMatch1 != null || lbMatch2.prevMatch2 != null) {
-              lbMatch2.player2 = nextLoser;
-            } else {
-              if (lbMatch2.player1 === "TBD" || !lbMatch2.player1) {
-                lbMatch2.player1 = nextLoser;
-              } else if (lbMatch2.player2 === "TBD" || !lbMatch2.player2) {
-                lbMatch2.player2 = nextLoser;
-              }
-            }
-            propagateLbBye(matches, lbMatch2, null);
-          }
-        }
       }
     }
   }
