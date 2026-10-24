@@ -1,5 +1,14 @@
 [
   {
+    "version": "beta-v0.5.1",
+    "environment": "int",
+    "date": "2026-10-24",
+    "notes": [
+      "Swap players now also works on TBD slots: in swap mode a TBD slot shows which earlier match feeds it (e.g. \"Winner R1 #3\") and can be swapped with another slot of the same round in the winners bracket, so a bracket can be rewired to mirror an external backup bracket",
+      "Swapping two named players works exactly as before"
+    ]
+  },
+  {
     "version": "beta-v0.5",
     "environment": "int",
     "date": "2026-10-05",

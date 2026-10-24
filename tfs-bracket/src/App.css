@@ -3486,3 +3486,12 @@ body {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Swap mode: shows which earlier match feeds a TBD slot */
+.swap-feeder {
+  display: block;
+  margin-top: 1px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+}

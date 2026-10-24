@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { groupByRound } from "../utils/bracket";
 import { getFcRoundName, getSetsWon } from "../utils/finalChampionship";
+import { isSwappableSlot, swapSlots, feederLabel } from "../utils/swap";
 
 function getRoundName(roundMatches, isLastRound, isFirstRound, hasPrelims) {
   if (isFirstRound && hasPrelims) return "Preliminary";
@@ -64,6 +65,7 @@ function MatchCard({ match, onMatchClick, isAdmin, isFc, onMatchWinConditionClic
           onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 0); }}
         >
           {match.player1 || "TBD"}
+          {canSwap && !p1Filled && feederLabel(match.prevMatch1) && <small className="swap-feeder">{feederLabel(match.prevMatch1)}</small>}
         </span>
         {isLive && <span className="score-badge score-live">{liveP1}</span>}
         {isPlayed && !hasBye && match.dq !== 1 && (
@@ -78,6 +80,7 @@ function MatchCard({ match, onMatchClick, isAdmin, isFc, onMatchWinConditionClic
           onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 1); }}
         >
           {match.player2 || "TBD"}
+          {canSwap && !p2Filled && feederLabel(match.prevMatch2) && <small className="swap-feeder">{feederLabel(match.prevMatch2)}</small>}
         </span>
         {isLive && <span className="score-badge score-live">{liveP2}</span>}
         {isPlayed && !hasBye && match.dq !== 0 && (
@@ -165,8 +168,7 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
   const handlePlayerClick = (matchId, slot) => {
     if (!swapSelected) {
       const match = matches.find(m => m.id === matchId);
-      const player = slot === 0 ? match?.player1 : match?.player2;
-      if (!player || player === "TBD" || player === "BYE") return;
+      if (!isSwappableSlot(match, slot)) return;
       setSwapSelected({ matchId, slot });
     } else {
       if (swapSelected.matchId === matchId && swapSelected.slot === slot) {
@@ -174,8 +176,11 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
         return;
       }
       const match2 = matches.find(m => m.id === matchId);
-      const player2 = slot === 0 ? match2?.player1 : match2?.player2;
-      if (!player2 || player2 === "TBD" || player2 === "BYE") {
+      // Refused pairs (e.g. a TBD slot of another round) just clear the selection.
+      if (
+        !isSwappableSlot(match2, slot) ||
+        swapSlots(matches, swapSelected.matchId, swapSelected.slot, matchId, slot) === matches
+      ) {
         setSwapSelected(null);
         return;
       }

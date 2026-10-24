@@ -439,3 +439,17 @@ Suite total: 240 tests across 19 files (180 before this iteration). New files: `
 4. **`App.css` is a single ~3000-line file**; consider CSS modules per component.
 5. **Docs drift** (`DEV_CONTEXT.md` test counts, README) - generate counts in CI instead of hand-editing.
 6. Standard double-elim ranking splits same-round losers (see Iteration 10); product decision.
+
+## Iteration 12: Swap players on TBD slots + same-round positions
+
+### 12a. Swapping TBD slots (`src/utils/swap.js`)
+Use case: recreate an external backup bracket exactly, including which prelim winner feeds which round-2 match.
+- `swapSlots(matches, id1, slot1, id2, slot2)` returns a new array, or the **same reference when refused**.
+  - named <-> named: delegates to the unchanged `swapPlayers` (any round, FC keeps its same-tier rule).
+  - anything involving a TBD slot: the whole slot (`playerN` **and** `prevMatchN` feeder link) is exchanged, so "winner of match X" moves to another match. `advanceBracket` routes winners through `prevMatch1/2`, so nothing else has to change.
+  - TBD rules (keep the bracket a valid tree, keep entry rounds): both slots in the **same round**, both on the **winners side** (winners bracket / single elimination; never losers bracket or grand final), no BYE, and none of the matches (or their feeders) played. Swapping is already only offered while no match has been played.
+- `isSwappableSlot(match, slot)`: named slot, or TBD slot with a feeder on the winners side.
+- `BracketView`: TBD slots are selectable in swap mode and show a hint such as `Winner R1 #3` (round number and 1-based match index of the feeder). Refused pairs just clear the selection.
+- `TournamentDetail`: uses `swapSlots`; a refused swap shows a toast. `canSwapSlots` (Final Championship tier rule) only compares tiers when both slots hold a player, so a Winner/Champion can be swapped with a TBD slot of their own round.
+- Not covered: the losers-bracket wiring (which winners-bracket loser drops into which losers match) is still the generated one. If the backup bracket drops losers differently, that needs its own editor.
+- Tests: `swap.test.js` (engine, refusals, property test: random accepted swaps on standard, single and Final Championship brackets always play out with every player losing exactly twice), `BracketViewSwapTbd.test.jsx`, `TournamentDetailSwap.test.jsx`.

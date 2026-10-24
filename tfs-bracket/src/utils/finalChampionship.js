@@ -39,15 +39,21 @@ export function getSetTarget(winCondition) {
   return Number.isFinite(n) && n > 0 ? n : 2;
 }
 
-// Swapping is only allowed between slots held by players of the same tier, so the
+// Swapping two named players is only allowed within the same tier, so the
 // Winner / Champion head-start can not be exploited from the swap tool.
 export function canSwapSlots(matches, participants, matchId1, slot1, matchId2, slot2) {
   const nameAt = (id, slot) => {
     const m = (matches || []).find((x) => x.id === id);
     return slot === 0 ? m?.player1 : m?.player2;
   };
+  const a = nameAt(matchId1, slot1);
+  const b = nameAt(matchId2, slot2);
+  const real = (n) => !!n && n !== "TBD" && n !== "BYE";
+  // A TBD slot holds nobody yet; swapSlots keeps it in its own round, so entry
+  // rounds stay intact and there is no tier to compare.
+  if (!real(a) || !real(b)) return true;
   const tierOf = (name) => getTier((participants || []).find((p) => p.name === name));
-  return tierOf(nameAt(matchId1, slot1)) === tierOf(nameAt(matchId2, slot2));
+  return tierOf(a) === tierOf(b);
 }
 
 // ── Pick / ban engine ───────────────────────────────────────

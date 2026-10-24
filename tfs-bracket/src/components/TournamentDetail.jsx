@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, setDoc, deleteDoc, serverTimestamp, registrationTokensRef, registrationEntriesRef, bracketTokensRef, query, where, onSnapshot } from "../firebase";
-import { generateBracket, generateDoubleEliminationBracket, advanceBracket, swapPlayers, parseFirestoreDate, computeRankings } from "../utils/bracket";
+import { generateBracket, generateDoubleEliminationBracket, advanceBracket, parseFirestoreDate, computeRankings } from "../utils/bracket";
+import { swapSlots } from "../utils/swap";
 import { logEvent } from "../utils/logger";
 import { addNames, removeName, renameName } from "../utils/participants";
 import { getUserName } from "../utils/user";
@@ -382,8 +383,11 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
       addToast("Players can only be swapped with others of the same tier", "error");
       return;
     }
-    const matches = swapPlayers(t.matches, matchId1, slot1, matchId2, slot2);
-    if (matches === t.matches) return;
+    const matches = swapSlots(t.matches, matchId1, slot1, matchId2, slot2);
+    if (matches === t.matches) {
+      addToast("These slots can't be swapped. A TBD slot can only be swapped with a slot of the same round in the winners bracket.", "error");
+      return;
+    }
     const ref = doc(db, "tournaments", t.id);
     await updateDoc(ref, { matches });
     onUpdate({ ...t, matches });
