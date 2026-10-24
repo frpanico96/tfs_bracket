@@ -5,7 +5,9 @@
     "date": "2026-10-24",
     "notes": [
       "Swap players now also works on TBD slots: in swap mode a TBD slot shows which earlier match feeds it (e.g. \"Winner R1 #3\") and can be swapped with another slot of the same round in the winners bracket, so a bracket can be rewired to mirror an external backup bracket",
-      "Swapping two named players works exactly as before"
+      "Swapping two named players works exactly as before",
+      "Double elimination positions: players knocked out in the same losers round now share a position and the same points (5th-6th, 7th-8th, 9th-12th, ...)",
+      "Score Settings only lists the positions that exist for the number of players in a double elimination bracket (e.g. 1, 2, 3, 4, 5, 7 for 8 players)"
     ]
   },
   {

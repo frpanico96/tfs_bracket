@@ -167,7 +167,7 @@ describe("generateFinalChampionshipBracket", () => {
           if (expected) expect(result.losses[p.name] || 0, `${label} ${p.name}`).toBe(2);
           else expect(result.losses[p.name] || 0, `${label} champion`).toBeLessThanOrEqual(1);
         }
-        const ranks = computeRankings(result.matches, "double", null, players, { rankByLosersExit: true });
+        const ranks = computeRankings(result.matches, "double", null, players);
         expect(ranks[0]?.players[0]?.name, label).toBe(champ);
         const ranked = ranks.flatMap((e) => e.players.map((q) => q.name));
         expect(new Set(ranked).size, label).toBe(players.length);
@@ -349,7 +349,7 @@ describe("rankings for the Final Championship bracket", () => {
       for (let seed = 1; seed <= 25; seed++) {
         const players = makePlayers(r, w, c);
         const { matches, exitRound } = playRecordingExits(players, seeded(seed * 31 + r));
-        const ranks = computeRankings(matches, "double", null, players, { rankByLosersExit: true });
+        const ranks = computeRankings(matches, "double", null, players);
         const rankOf = {};
         ranks.forEach((e) => e.players.forEach((p) => { rankOf[p.name] = e.rank; }));
         const names = Object.keys(exitRound);
@@ -362,14 +362,6 @@ describe("rankings for the Final Championship bracket", () => {
         }
       }
     }
-  });
-
-  it("leaves the default ranking behaviour untouched when the option is not set", () => {
-    const players = makePlayers(6, 0, 0);
-    const { matches } = playRecordingExits(players, seeded(9));
-    expect(computeRankings(matches, "double", null, players)).toEqual(
-      computeRankings(matches, "double", null, players, {})
-    );
   });
 });
 
@@ -454,6 +446,12 @@ describe("canSwapSlots", () => {
     expect(canSwapSlots(ms, people, "m1", 0, "m2", 0)).toBe(true);
     expect(canSwapSlots(ms, people, "m1", 0, "m1", 1)).toBe(false);
     expect(canSwapSlots(ms, people, "m1", 1, "m2", 1)).toBe(false);
+  });
+  it("lets any player be swapped with a TBD slot (the swap itself keeps the round)", () => {
+    const withTbd = [{ id: "t", player1: "TBD", player2: "TBD" }, ...ms];
+    expect(canSwapSlots(withTbd, people, "t", 0, "m1", 1)).toBe(true); // TBD <-> winner
+    expect(canSwapSlots(withTbd, people, "m2", 1, "t", 1)).toBe(true); // champion <-> TBD
+    expect(canSwapSlots(withTbd, people, "t", 0, "t", 1)).toBe(true);
   });
   it("treats unknown players as regular", () => {
     expect(canSwapSlots([{ id: "x", player1: "Z", player2: "A" }], people, "x", 0, "x", 1)).toBe(true);

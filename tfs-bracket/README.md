@@ -14,9 +14,9 @@ Built for **Team Fight Series (TFS)** — a community fighting game tournament o
 - **Role-based Access** — Super Admin, Tournament Admin, and Player roles
 - **Invite-only UAT** — Secure invite system with email invites and shareable invite links
 - **Participant Management** — Add existing users or create new players via picklist + name field
-- **Custom Point System** — Assign points per finishing rank via "Set Scores" modal
+- **Custom Point System** — Assign points per finishing rank via "Set Scores" modal; in double elimination only the positions that exist for the number of players are listed and players knocked out in the same losers round share a position
 - **Leaderboard** — Cumulative scores across all completed tournaments, real-time updates
-- **Player Swap** — Admin can swap players between unfilled match slots before recording scores
+- **Player Swap** — Admin can swap players between unfilled match slots before recording scores, including TBD slots of the same round to mirror an external backup bracket
 - **Rankings Sidebar** — Post-tournament rankings computed from bracket results, visible to all users
 - **Completed Tournament Handling** — Auto-assign scores, sort completed tournaments to bottom
 - **Session Persistence** — Auth and navigation state survive page refresh

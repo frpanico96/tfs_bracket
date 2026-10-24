@@ -776,7 +776,7 @@ function computeSingleElimRankings(allMatches, rankScores) {
   return result;
 }
 
-function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = false) {
+function computeDoubleElimRankings(allMatches, rankScores) {
   const gfM0 = allMatches.find(m => m.id === 'gf-m0');
   const gfM1 = allMatches.find(m => m.id === 'gf-m1');
 
@@ -797,51 +797,6 @@ function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = fa
   if (realPlayer(champ)) addRankingEntry(result, 1, "Champion", [champ], pts(1));
   if (realPlayer(runnerUp)) addRankingEntry(result, 2, "Runner-up", [runnerUp], pts(2));
 
-  const wbMatches = allMatches.filter(m => m.bracket === 'winners');
-  const lbMatches = allMatches.filter(m => m.bracket === 'losers');
-  const wbRounds = groupByRound(wbMatches);
-  const lbRounds = groupByRound(lbMatches);
-
-  const wbFinal = wbRounds[wbRounds.length - 1]?.[0];
-  const lbFinal = lbRounds[lbRounds.length - 1]?.[0];
-
-  let wbFinalLoser = null;
-  if (wbFinal && wbFinal.winner != null) {
-    wbFinalLoser = wbFinal.winner === 0 ? wbFinal.player2 : wbFinal.player1;
-    if (!realPlayer(wbFinalLoser)) wbFinalLoser = null;
-  }
-
-  const wbFinalLoserInGf = wbFinalLoser && gfM0 &&
-    (gfM0.player1 === wbFinalLoser || gfM0.player2 === wbFinalLoser);
-
-  let third = null;
-  if (wbFinalLoser && !wbFinalLoserInGf) {
-    third = wbFinalLoser;
-  } else if (lbFinal && lbFinal.winner != null) {
-    third = lbFinal.winner === 0 ? lbFinal.player2 : lbFinal.player1;
-    if (!realPlayer(third)) third = null;
-  }
-
-  if (third && third !== champ && third !== runnerUp) {
-    addRankingEntry(result, 3, "Third Place", [third], pts(3));
-  }
-
-  let fourth = null;
-  if (third === wbFinalLoser) {
-    if (lbFinal && lbFinal.winner != null) {
-      fourth = lbFinal.winner === 0 ? lbFinal.player2 : lbFinal.player1;
-      if (!realPlayer(fourth)) fourth = null;
-    }
-  } else {
-    fourth = wbFinalLoser;
-  }
-
-  if (fourth && fourth !== champ && fourth !== runnerUp && fourth !== third) {
-    addRankingEntry(result, 4, "Fourth Place", [fourth], pts(4));
-  }
-
-  const ranked = new Set([champ, runnerUp, third, fourth].filter(Boolean));
-
   const allPlayers = new Set();
   for (const m of allMatches) {
     for (const p of [m.player1, m.player2]) {
@@ -849,9 +804,13 @@ function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = fa
     }
   }
 
+  // Everyone else is knocked out by a losers-bracket loss. Players knocked out in
+  // the same losers round share a placement (and therefore the same points).
+  // Round numbers of the two brackets are not comparable, so the losers-bracket
+  // loss is used instead of "the highest round lost".
   const remaining = [];
   for (const player of allPlayers) {
-    if (ranked.has(player)) continue;
+    if (player === champ || player === runnerUp) continue;
     let lastLoss = null;
     let losersLoss = null;
     for (const m of allMatches) {
@@ -861,11 +820,8 @@ function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = fa
       if (!lastLoss || m.round > lastLoss.round) lastLoss = m;
       if (m.bracket === 'losers') losersLoss = m;
     }
-    // Opt-in (Final Championship): a player is knocked out by a losers-bracket loss, and
-    // round numbers of the two brackets are not comparable, so rank by that loss instead
-    // of "highest round". Standard tournaments keep the original behaviour.
-    const eliminatingLoss = rankByLosersExit ? (losersLoss || lastLoss) : lastLoss;
-    if (eliminatingLoss) remaining.push({ player, loss: eliminatingLoss });
+    const loss = losersLoss || lastLoss;
+    if (loss) remaining.push({ player, loss });
   }
 
   const bracketOrder = { grandFinal: 0, winners: 1, losers: 2 };
@@ -890,7 +846,12 @@ function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = fa
       }
     }
     const players = group.map(p => p.player);
-    const label = players.length === 1 ? ` ${pos}${getOrdinal(pos)} Place` : ` ${pos}${getOrdinal(pos)}-${pos + players.length - 1}${getOrdinal(pos + players.length - 1)}`;
+    const end = pos + players.length - 1;
+    let label;
+    if (players.length === 1 && pos === 3) label = "Third Place";
+    else if (players.length === 1 && pos === 4) label = "Fourth Place";
+    else if (players.length === 1) label = ` ${pos}${getOrdinal(pos)} Place`;
+    else label = ` ${pos}${getOrdinal(pos)}-${end}${getOrdinal(end)}`;
     addRankingEntry(result, pos, label, players, pts(pos));
     pos += players.length;
     i++;
@@ -899,7 +860,7 @@ function computeDoubleElimRankings(allMatches, rankScores, rankByLosersExit = fa
   return result;
 }
 
-export function computeRankings(matches, bracketType, rankScores, participants, options = {}) {
+export function computeRankings(matches, bracketType, rankScores, participants) {
   if (!matches || matches.length === 0) return [];
 
   const hasPlayedMatches = matches.some(m => m.winner != null && m.isPlayed);
@@ -914,7 +875,7 @@ export function computeRankings(matches, bracketType, rankScores, participants, 
 
   let rankings;
   if (bracketType === 'double') {
-    rankings = computeDoubleElimRankings(matches, rankScores, options.rankByLosersExit === true);
+    rankings = computeDoubleElimRankings(matches, rankScores);
   } else {
     rankings = computeSingleElimRankings(matches, rankScores);
   }

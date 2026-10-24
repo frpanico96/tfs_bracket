@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { db, doc, updateDoc, getDoc, increment, getDocs, usersRef, addDoc, setDoc, deleteDoc, serverTimestamp, registrationTokensRef, registrationEntriesRef, bracketTokensRef, query, where, onSnapshot } from "../firebase";
 import { generateBracket, generateDoubleEliminationBracket, advanceBracket, parseFirestoreDate, computeRankings } from "../utils/bracket";
 import { swapSlots } from "../utils/swap";
+import { getPositionGroups } from "../utils/positions";
 import { logEvent } from "../utils/logger";
 import { addNames, removeName, renameName } from "../utils/participants";
 import { getUserName } from "../utils/user";
@@ -19,6 +20,13 @@ import {
   TIERS,
   TIER_LABELS,
 } from "../utils/finalChampionship";
+
+const ordinal = (n) => {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] || "th"}`;
+};
+const placeLabel = (rank, size) => (size > 1 ? `${ordinal(rank)}-${ordinal(rank + size - 1)} Place` : `${ordinal(rank)} Place`);
 
 const WIN_CONDITIONS = ["ft2", "ft3", "ft5", "ft7", "ft9"];
 
@@ -64,6 +72,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [editParticipantEmail, setEditParticipantEmail] = useState("");
   const [showRankScores, setShowRankScores] = useState(false);
   const [rankScoreValues, setRankScoreValues] = useState([]);
+  const [rankPositions, setRankPositions] = useState(null);
   const [showJoinConfirm, setShowJoinConfirm] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -76,8 +85,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const addToast = useToast();
 
   const rawRankings = useMemo(
-    () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants, { rankByLosersExit: isFc }) : [],
-    [t.matches, t.bracketType, t.rankScores, t.participants, isFc]
+    () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
+    [t.matches, t.bracketType, t.rankScores, t.participants]
   );
 
   const [rankingsReady, setRankingsReady] = useState(false);
@@ -230,7 +239,7 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     const activeMatches = updatedTournament.matches.filter((m) => !(m.isGrandFinalReset && m.player1 === "TBD"));
     const allDone = activeMatches.length > 0 && activeMatches.every((m) => m.winner != null);
     if (allDone && !t.scoresAssigned) {
-      const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants, { rankByLosersExit: isFc });
+      const finalRanks = computeRankings(matches, t.bracketType, t.rankScores, t.participants);
       if (!t.rankScores) {
         console.warn("Awarding scores: no rankScores configured, all points will be 0");
       }
@@ -463,6 +472,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     const existing = t.rankScores || [];
     const scores = Array.from({ length: t.maxParticipants }, (_, i) => (existing[i] != null ? existing[i] : 0));
     setRankScoreValues(scores);
+    // Double elimination only awards some positions (same losers round = same position).
+    setRankPositions(getPositionGroups(t));
     setShowRankScores(true);
   };
 
@@ -1065,10 +1076,23 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
         title="Score Settings"
       >
         <p className="modal-desc">Set points awarded for each finishing position.</p>
+        {rankPositions && (
+          <p className="modal-desc rank-positions-note">
+            Double elimination: only the positions that exist for{" "}
+            {rankPositions.estimated ? `up to ${rankPositions.playerCount}` : rankPositions.playerCount} players are shown.
+            Players knocked out in the same losers round share a position and the same points.
+            {rankPositions.estimated
+              ? " No participants yet, so this is based on the maximum number of players."
+              : " Check again once registration is closed: the positions follow the number of players."}
+          </p>
+        )}
         <div className="rank-scores-list">
-          {rankScoreValues.map((val, i) => (
+          {rankScoreValues.map((val, i) => {
+            const group = rankPositions ? rankPositions.groups.find((g) => g.rank === i + 1) : null;
+            if (rankPositions && !group) return null;
+            return (
             <label key={i} className="rank-score-field">
-              <span className="rank-score-label">{i + 1}{i === 0 ? "st" : i === 1 ? "nd" : i === 2 ? "rd" : "th"} Place</span>
+              <span className="rank-score-label">{placeLabel(i + 1, group?.size || 1)}</span>
               <input
                 type="number"
                 min="0"
@@ -1081,7 +1105,8 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
                 className="rank-score-input"
               />
             </label>
-          ))}
+            );
+          })}
         </div>
         <div className="modal-actions">
           <button type="button" className="btn-secondary" onClick={() => setShowRankScores(false)}>
