@@ -63,26 +63,28 @@ describe("BracketView - swapping TBD slots", () => {
     );
     expect(tbdSpans.length).toBeGreaterThan(3); // at least one non-selectable TBD slot exists
     let selectable = 0;
+    const hints = [];
     for (const span of tbdSpans) {
       await user.click(span);
       const selected = span.className.includes("swap-selected");
-      // Winners-side TBD slots carry a feeder hint; losers bracket / grand final ones do not.
-      expect(selected, span.parentElement.textContent).toBe(!!span.querySelector(".swap-feeder"));
+      // Only slots fed by a winners-bracket winner (outside the grand final) can be rewired.
+      const hint = span.querySelector(".slot-hint")?.textContent ?? "";
+      expect(selected, span.parentElement.textContent).toBe(hint.startsWith("Winner WB") && !span.closest(".grand-final"));
+      if (selected) hints.push(hint);
       if (selected) {
         selectable++;
         await user.click(span); // deselect
       }
     }
     expect(selectable).toBe(3);
+    expect(hints).toEqual(["Winner WB R1 #1", "Winner WB R2 #1", "Winner WB R2 #2"]);
   });
 
-  it("shows which match feeds a TBD slot while swapping", () => {
+  it("always shows which match feeds a TBD slot", () => {
     setup(true);
-    expect(screen.getAllByText("Winner R1 #1").length).toBeGreaterThan(0);
-  });
-
-  it("does not show feeder hints outside swap mode", () => {
+    expect(screen.getAllByText("Winner WB R1 #1").length).toBeGreaterThan(0);
+    document.body.innerHTML = "";
     setup(false);
-    expect(screen.queryByText("Winner R1 #1")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Winner WB R1 #1").length).toBeGreaterThan(0);
   });
 });

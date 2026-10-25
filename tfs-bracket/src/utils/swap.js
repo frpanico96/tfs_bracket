@@ -63,9 +63,3 @@ export function swapSlots(matches, matchId1, slot1, matchId2, slot2) {
   u2[k2.prev] = prev1;
   return updated;
 }
-
-// "wb-r1-m2" / "r1-m2" -> "Winner R1 #3" (null when the id has no known shape).
-export function feederLabel(matchId) {
-  const m = /r(\d+)-m(\d+)$/.exec(matchId || "");
-  return m ? `Winner R${m[1]} #${Number(m[2]) + 1}` : null;
-}

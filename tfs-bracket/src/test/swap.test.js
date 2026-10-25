@@ -6,7 +6,7 @@ import {
   swapPlayers,
 } from "../utils/bracket";
 import { generateFinalChampionshipBracket } from "../utils/finalChampionship";
-import { swapSlots, isSwappableSlot, feederLabel } from "../utils/swap";
+import { swapSlots, isSwappableSlot } from "../utils/swap";
 
 function seeded(seed) {
   let a = seed >>> 0;
@@ -142,7 +142,7 @@ describe("swapSlots - refusals return the same array", () => {
   });
 });
 
-describe("isSwappableSlot / feederLabel", () => {
+describe("isSwappableSlot", () => {
   const ms = double11();
   it("accepts named slots and fed TBD slots of the winners side only", () => {
     expect(isSwappableSlot(byId(ms, "wb-r2-m0"), 1)).toBe(true);
@@ -151,12 +151,6 @@ describe("isSwappableSlot / feederLabel", () => {
     expect(isSwappableSlot({ id: "x", player1: "BYE", player2: "A" }, 0)).toBe(false);
     expect(isSwappableSlot({ id: "x", player1: "TBD", player2: "A" }, 0)).toBe(false);
     expect(isSwappableSlot(undefined, 0)).toBe(false);
-  });
-  it("labels feeders", () => {
-    expect(feederLabel("wb-r1-m2")).toBe("Winner R1 #3");
-    expect(feederLabel("r2-m0")).toBe("Winner R2 #1");
-    expect(feederLabel(null)).toBeNull();
-    expect(feederLabel("gf-m0")).toBeNull();
   });
 });
 

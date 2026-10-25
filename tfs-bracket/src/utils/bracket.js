@@ -336,13 +336,18 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
       }
       lbRoundNum++;
     } else {
-      // Cross round: prev LB winners vs WB losers from this round
+      // Cross round: prev LB winners vs WB losers from this round.
+      // The WB losers drop in mirrored order: the loser of the FIRST winners-bracket
+      // match of the round plays LAST in the losers bracket, the loser of the LAST
+      // winners-bracket match plays FIRST. This keeps players who just met in the
+      // winners bracket apart for as long as possible (no early rematches).
+      const dropOrder = [...wbMatchesThis].reverse();
       const crossIds = [];
       let wbIdx = 0;
       let prevIdx = 0;
 
-      while (prevIdx < prevLbIds.length && wbIdx < wbMatchesThis.length) {
-        const wbM = wbMatchesThis[wbIdx];
+      while (prevIdx < prevLbIds.length && wbIdx < dropOrder.length) {
+        const wbM = dropOrder[wbIdx];
         const hasRealLoser = wbM && !isByeMatch(wbM);
         if (hasRealLoser) {
           const m = addLbMatch(prevLbIds[prevIdx], null, null, wbM.id);
@@ -362,8 +367,8 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
         prevIdx++;
       }
       // Remaining WB losers (more WB losers than LB winners) — get a BYE in LB
-      while (wbIdx < wbMatchesThis.length) {
-        const wbM = wbMatchesThis[wbIdx];
+      while (wbIdx < dropOrder.length) {
+        const wbM = dropOrder[wbIdx];
         if (wbM && !isByeMatch(wbM)) {
           const m = addLbMatch(null, null, null, wbM.id);
           wbM.loserGoesTo = m.id;
@@ -558,7 +563,13 @@ export function advanceBracket(matches, matchIndex, winnerIndex, scores) {
   if (match.bracket === 'winners' && match.loserGoesTo && loser !== "BYE") {
     const loserMatch = updatedMatches.find(m => m.id === match.loserGoesTo);
     if (loserMatch) {
-      if (loserMatch.prevMatch1 != null || loserMatch.prevMatch2 != null) {
+      // A losers match that names its winners-bracket feeders gets each loser in the
+      // slot it was announced for (so "Loser of WB R2 #1" really is player 1 / 2).
+      if (loserMatch.prevMatchLoser1 === match.id) {
+        loserMatch.player1 = loser;
+      } else if (loserMatch.prevMatchLoser2 === match.id) {
+        loserMatch.player2 = loser;
+      } else if (loserMatch.prevMatch1 != null || loserMatch.prevMatch2 != null) {
         loserMatch.player2 = loser;
       } else {
         if (loserMatch.player1 === "TBD" || !loserMatch.player1) {

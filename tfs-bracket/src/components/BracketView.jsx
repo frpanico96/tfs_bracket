@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { groupByRound } from "../utils/bracket";
 import { getFcRoundName, getSetsWon } from "../utils/finalChampionship";
-import { isSwappableSlot, swapSlots, feederLabel } from "../utils/swap";
+import { isSwappableSlot, swapSlots } from "../utils/swap";
+import { slotSourceLabel } from "../utils/slotLabels";
 
 function getRoundName(roundMatches, isLastRound, isFirstRound, hasPrelims) {
   if (isFirstRound && hasPrelims) return "Preliminary";
@@ -26,6 +27,15 @@ function getWbRoundName(roundMatches, roundIndex, totalRounds) {
 function getLbRoundName(roundMatches, roundIndex, totalRounds) {
   if (roundIndex === totalRounds - 1) return "Losers Final";
   return `Losers Round ${roundMatches[0]?.round ?? 0}`;
+}
+
+const MatchLookupContext = createContext(null);
+
+function SlotHint({ match, slot }) {
+  const byId = useContext(MatchLookupContext);
+  const hint = slotSourceLabel(match, slot, byId);
+  if (!hint) return null;
+  return <small className="slot-hint" title={hint.title}>{hint.text}</small>;
 }
 
 function MatchCard({ match, onMatchClick, isAdmin, isFc, onMatchWinConditionClick, canSwap, swapSelected, onPlayerClick }) {
@@ -65,7 +75,7 @@ function MatchCard({ match, onMatchClick, isAdmin, isFc, onMatchWinConditionClic
           onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 0); }}
         >
           {match.player1 || "TBD"}
-          {canSwap && !p1Filled && feederLabel(match.prevMatch1) && <small className="swap-feeder">{feederLabel(match.prevMatch1)}</small>}
+          <SlotHint match={match} slot={0} />
         </span>
         {isLive && <span className="score-badge score-live">{liveP1}</span>}
         {isPlayed && !hasBye && match.dq !== 1 && (
@@ -80,7 +90,7 @@ function MatchCard({ match, onMatchClick, isAdmin, isFc, onMatchWinConditionClic
           onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 1); }}
         >
           {match.player2 || "TBD"}
-          {canSwap && !p2Filled && feederLabel(match.prevMatch2) && <small className="swap-feeder">{feederLabel(match.prevMatch2)}</small>}
+          <SlotHint match={match} slot={1} />
         </span>
         {isLive && <span className="score-badge score-live">{liveP2}</span>}
         {isPlayed && !hasBye && match.dq !== 0 && (
@@ -108,6 +118,7 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, isFc, label, onMatchWin
         <div className="round-matches">
           <div className="match future">
             <div className="match-row"><span>Awaiting finalists...</span></div>
+            {[0, 1].map((slot) => <div key={slot} className="match-row"><SlotHint match={match} slot={slot} /></div>)}
           </div>
         </div>
       </div>
@@ -135,6 +146,7 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, isFc, label, onMatchWin
               onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 0); }}
             >
               {match.player1 || "TBD"}
+              <SlotHint match={match} slot={0} />
             </span>
             {isPlayed && match.dq !== 1 && (
               <span className={`score-badge ${match.winner === 0 ? "score-winner" : "score-loser"} ${match.dq === 0 ? "dq-badge" : ""}`}>
@@ -147,6 +159,7 @@ function GrandFinalMatch({ match, onMatchClick, isAdmin, isFc, label, onMatchWin
               onClick={(e) => { e.stopPropagation(); if (canSwap) onPlayerClick(match.id, 1); }}
             >
               {match.player2 || "TBD"}
+              <SlotHint match={match} slot={1} />
             </span>
             {isPlayed && match.dq !== 0 && (
               <span className={`score-badge ${match.winner === 1 ? "score-winner" : "score-loser"} ${match.dq === 1 ? "dq-badge" : ""}`}>
@@ -164,6 +177,7 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
   const isDouble = bracketType === "double";
   const isFc = tournamentType === "final_championship";
   const [swapSelected, setSwapSelected] = useState(null);
+  const byId = useMemo(() => new Map((matches || []).map((m) => [m.id, m])), [matches]);
 
   const handlePlayerClick = (matchId, slot) => {
     if (!swapSelected) {
@@ -195,6 +209,7 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
 
   if (!isDouble) {
     return (
+      <MatchLookupContext.Provider value={byId}>
       <SingleBracketView
         matches={matches}
         onMatchClick={onMatchClick}
@@ -204,10 +219,12 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
         swapSelected={swapSelected}
         onPlayerClick={handlePlayerClick}
       />
+      </MatchLookupContext.Provider>
     );
   }
 
   return (
+    <MatchLookupContext.Provider value={byId}>
     <DoubleBracketView
       matches={matches}
       onMatchClick={onMatchClick}
@@ -218,6 +235,7 @@ export default function BracketView({ matches, onMatchClick, isAdmin, bracketTyp
       swapSelected={swapSelected}
       onPlayerClick={handlePlayerClick}
     />
+    </MatchLookupContext.Provider>
   );
 }
 

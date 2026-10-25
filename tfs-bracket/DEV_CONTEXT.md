@@ -448,7 +448,7 @@ Use case: recreate an external backup bracket exactly, including which prelim wi
   - anything involving a TBD slot: the whole slot (`playerN` **and** `prevMatchN` feeder link) is exchanged, so "winner of match X" moves to another match. `advanceBracket` routes winners through `prevMatch1/2`, so nothing else has to change.
   - TBD rules (keep the bracket a valid tree, keep entry rounds): both slots in the **same round**, both on the **winners side** (winners bracket / single elimination; never losers bracket or grand final), no BYE, and none of the matches (or their feeders) played. Swapping is already only offered while no match has been played.
 - `isSwappableSlot(match, slot)`: named slot, or TBD slot with a feeder on the winners side.
-- `BracketView`: TBD slots are selectable in swap mode and show a hint such as `Winner R1 #3` (round number and 1-based match index of the feeder). Refused pairs just clear the selection.
+- `BracketView`: TBD slots are selectable in swap mode (hint text: see Iteration 13). Refused pairs just clear the selection.
 - `TournamentDetail`: uses `swapSlots`; a refused swap shows a toast. `canSwapSlots` (Final Championship tier rule) only compares tiers when both slots hold a player, so a Winner/Champion can be swapped with a TBD slot of their own round.
 - Not covered: the losers-bracket wiring (which winners-bracket loser drops into which losers match) is still the generated one. If the backup bracket drops losers differently, that needs its own editor.
 - Tests: `swap.test.js` (engine, refusals, property test: random accepted swaps on standard, single and Final Championship brackets always play out with every player losing exactly twice), `BracketViewSwapTbd.test.jsx`, `TournamentDetailSwap.test.jsx`.
@@ -459,3 +459,18 @@ Use case: recreate an external backup bracket exactly, including which prelim wi
 - Score Settings modal (`TournamentDetail`): lists only available positions, tie rows are labelled "5th-6th Place". Values are still stored in `rankScores[rank - 1]`, so existing data keeps working and a position that is not listed is simply ignored. With fewer than 2 participants the maximum player count is used (note shown). The list follows the number of registered players, so check it again once registration is closed.
 - Existing data: tournaments whose scores were already awarded are not recalculated. Tournaments finished before this change show shared positions in the sidebar from now on (rankings are derived from the matches), and the points of the second player of a tie are now those of the first position of the group.
 - Tests: `positions.test.js` (position tables, sums, independence from results, same-round ties with distinct points per rank), `TournamentDetailPositions.test.jsx` (modal), plus the Iteration 10 ranking tests.
+
+## Iteration 13: Losers bracket mirror order + expected-player hints
+
+### 13a. Mirror drop order (`bracket.js`)
+Winners-bracket losers now enter each losers "drop-in" round in **reverse** order: the loser of the first WB match of that round plays the **last** LB match of the round, and the last WB match's loser plays the first (16 players: `wb-r2-m0..m3 -> lb-r2-m3..m0`). This applies to every drop-in round, not only round 2, and separates players who just met in the WB (rematches over 200 random tournaments: n=8 267->145, n=16 585->177, n=32 1316->394, n=64 2664->859).
+- Only the loser mapping changed: WB and LB winner links, round counts and positions are identical for sizes 2-64. Final Championship already mirrored and is unaffected.
+- `advanceBracket` drops a loser into the slot named by `prevMatchLoser1/2` of the target (deterministic); the old first-free-slot logic remains as fallback for older stored brackets.
+- Existing tournaments keep their stored wiring; only newly generated or reset brackets get the mirrored order.
+
+### 13b. Expected-player hints on every TBD slot (`utils/slotLabels.js`)
+Display only: the stored value stays `"TBD"`; a child `<small class="slot-hint">` is shown (the span's own text is still exactly "TBD").
+- WB: `Winner WB R1 #3`; single elimination: `Winner R1 #3`; LB: `Winner LB R2 #1` / `Loser WB R2 #1`; grand final: winner of the WB / LB final; reset: `Grand Final finalist`. BYE and named slots show nothing.
+- `title` tooltip with the real names once the source match is known (`Loser of Ann vs Bob`). The lookup comes from a context in `BracketView`.
+- The hint is always visible now (it used to show in swap mode only); `feederLabel` was removed from `swap.js`. The grand final placeholder card also lists its two sources.
+- Tests: `lbMirrorAndHints.test.js`, updated `BracketViewSwapTbd.test.jsx` / `swap.test.js`.
