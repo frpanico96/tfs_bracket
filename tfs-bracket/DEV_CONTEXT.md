@@ -463,7 +463,7 @@ Use case: recreate an external backup bracket exactly, including which prelim wi
 ## Iteration 13: Losers bracket mirror order + expected-player hints
 
 ### 13a. Mirror drop order (`bracket.js`)
-Winners-bracket losers now enter each losers "drop-in" round in **reverse** order: the loser of the first WB match of that round plays the **last** LB match of the round, and the last WB match's loser plays the first (16 players: `wb-r2-m0..m3 -> lb-r2-m3..m0`). This applies to every drop-in round, not only round 2, and separates players who just met in the WB (rematches over 200 random tournaments: n=8 267->145, n=16 585->177, n=32 1316->394, n=64 2664->859).
+Winners-bracket losers now enter **losers round 2 only** (the first drop-in round) in **reverse** order: the loser of the first WB match of that round plays the **last** LB match of the round, and the last WB match's loser plays the first (16 players: `wb-r2-m0..m3 -> lb-r2-m3..m0`). Later drop-in rounds keep the natural order (changed after feedback: mirroring every round mixed players badly). It separates players who just met in the WB (rematch figures quoted in the first version of this patch were for mirroring every round and no longer apply).
 - Only the loser mapping changed: WB and LB winner links, round counts and positions are identical for sizes 2-64. Final Championship already mirrored and is unaffected.
 - `advanceBracket` drops a loser into the slot named by `prevMatchLoser1/2` of the target (deterministic); the old first-free-slot logic remains as fallback for older stored brackets.
 - Existing tournaments keep their stored wiring; only newly generated or reset brackets get the mirrored order.

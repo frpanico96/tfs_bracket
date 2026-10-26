@@ -337,11 +337,11 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
       lbRoundNum++;
     } else {
       // Cross round: prev LB winners vs WB losers from this round.
-      // The WB losers drop in mirrored order: the loser of the FIRST winners-bracket
-      // match of the round plays LAST in the losers bracket, the loser of the LAST
-      // winners-bracket match plays FIRST. This keeps players who just met in the
-      // winners bracket apart for as long as possible (no early rematches).
-      const dropOrder = [...wbMatchesThis].reverse();
+      // Losers bracket ROUND 2 only: the WB losers drop in mirrored order, i.e. the loser
+      // of the FIRST winners-bracket match plays LAST in that losers round and the loser of
+      // the LAST winners-bracket match plays FIRST (keeps players who just met apart).
+      // Later drop-in rounds keep the natural order so players mix differently.
+      const dropOrder = lbRoundNum === 2 ? [...wbMatchesThis].reverse() : wbMatchesThis;
       const crossIds = [];
       let wbIdx = 0;
       let prevIdx = 0;

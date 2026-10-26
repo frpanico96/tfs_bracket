@@ -19,7 +19,7 @@ function playAll(matches) {
   return { ms, losses };
 }
 
-describe("losers bracket mirror drop order", () => {
+describe("losers round 2 mirror drop order", () => {
   it("first WB loser of a drop round plays last in the LB round (16 players)", () => {
     const ms = gen(16);
     const wb = ms.filter((m) => m.id.startsWith("wb-r2-"));
@@ -28,6 +28,17 @@ describe("losers bracket mirror drop order", () => {
     wb.forEach((m, i) => expect(m.loserGoesTo).toBe(`lb-r2-m${wb.length - 1 - i}`));
     expect(lbDrop[lbDrop.length - 1].prevMatchLoser2 ?? lbDrop[lbDrop.length - 1].prevMatchLoser1).toBe("wb-r2-m0");
     expect(lbDrop[0].prevMatchLoser2 ?? lbDrop[0].prevMatchLoser1).toBe("wb-r2-m3");
+  });
+
+  it("only losers round 2 is mirrored; later drop-in rounds keep natural order (32 players)", () => {
+    const ms = gen(32);
+    const wb2 = ms.filter((m) => m.id.startsWith("wb-r2-"));
+    wb2.forEach((m, i) => expect(m.loserGoesTo).toBe(`lb-r2-m${wb2.length - 1 - i}`));
+    for (const r of [3, 4, 5]) {
+      ms.filter((m) => m.id.startsWith(`wb-r${r}-`) && m.loserGoesTo).forEach((m) => {
+        expect(m.loserGoesTo).toMatch(new RegExp(`^lb-r\\d+-m${m.matchIndex}$`));
+      });
+    }
   });
 
   it("advanceBracket drops the loser into the slot named by prevMatchLoser", () => {

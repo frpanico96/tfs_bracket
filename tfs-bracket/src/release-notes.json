@@ -4,7 +4,7 @@
     "environment": "int",
     "date": "2026-10-25",
     "notes": [
-      "Losers bracket: players dropping from the winners bracket now enter in mirrored order (the loser of the first winners match plays last in that losers round, the loser of the last one plays first), which avoids many early rematches. Applies to newly created or reset brackets",
+      "Losers bracket round 2: players dropping from the winners bracket now enter in mirrored order (the loser of the first winners match plays last in that losers round, the loser of the last one plays first), later losers rounds keep the usual order. Applies to newly created or reset brackets",
       "Every TBD slot in the winners bracket, losers bracket and grand final now shows who is expected there (e.g. \"Winner WB R1 #3\", \"Loser WB R2 #1\"); hover shows the real players when known"
     ]
   },
