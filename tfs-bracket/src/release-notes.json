@@ -1,5 +1,17 @@
 [
   {
+    "version": "beta-v0.5.3",
+    "environment": "int",
+    "date": "2026-10-26",
+    "notes": [
+      "Seeding: when a tournament starts (or the bracket is reset) players are ranked by their leaderboard score and matched by seed - best vs worst (8 players: 1v8, 4v5, 2v7, 3v6)",
+      "When the field is not a full round, the best seeds get the byes (20 players: seeds 1-12 skip round 1, seeds 13-20 play it)",
+      "Final Championship: regular players are seeded the same way; Winners start one round after the most advanced regular entry round and Champions one more (e.g. 20 regulars: Winners round 3, Champions round 4)",
+      "Players without a score (or equal scores) are ordered randomly; if the leaderboard can not be read the draw is random",
+      "Losers bracket round 2 mirror order: only round 2 is mirrored, later losers rounds keep the usual order"
+    ]
+  },
+  {
     "version": "beta-v0.5.2",
     "environment": "int",
     "date": "2026-10-25",

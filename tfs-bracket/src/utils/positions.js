@@ -46,6 +46,14 @@ export function getPositionGroups(tournament) {
     estimated = true;
   }
 
+  // Brackets are seeded when started, so measure the seeded shape (it only differs for
+  // Final Championship fields whose regular players are not a power of two).
+  // Tournaments started before seeding existed (or whose seeding fell back to a random
+  // draw) have `started` without `seeded` and keep the unseeded shape.
+  if (!tournament.started || tournament.seeded) {
+    players = players.map((p, i) => ({ ...p, seed: Number.isFinite(p.seed) ? p.seed : i + 1 }));
+  }
+
   const matches = isFinalChampionship(tournament)
     ? generateFinalChampionshipBracket(players, max, fixedRng(1))
     : generateDoubleEliminationBracket(players, max, "ft3");

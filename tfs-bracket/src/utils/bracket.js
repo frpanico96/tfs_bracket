@@ -1,10 +1,13 @@
+import { hasSeeds, bySeed, seededFirstRound } from "./seeding";
+
 export function generateBracket(participants, max, winCondition) {
   return generateSingleEliminationBracket(participants, max, winCondition);
 }
 
 function generateSingleEliminationBracket(participants, max, winCondition) {
   const wc = winCondition || "ft3";
-  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  const seeded = hasSeeds(participants);
+  const shuffled = seeded ? [...participants].sort(bySeed) : [...participants].sort(() => Math.random() - 0.5);
   const numPlayers = Math.min(shuffled.length, max);
   const players = shuffled.slice(0, numPlayers);
   const matches = [];
@@ -14,6 +17,7 @@ function generateSingleEliminationBracket(participants, max, winCondition) {
   const base = Math.pow(2, Math.floor(Math.log2(numPlayers)));
   const prelimMatches = numPlayers - base;
   const hasPrelims = prelimMatches > 0;
+  const layout = seeded ? seededFirstRound(players, base) : null;
 
   if (hasPrelims) {
     for (let i = 0; i < prelimMatches; i++) {
@@ -21,8 +25,8 @@ function generateSingleEliminationBracket(participants, max, winCondition) {
         id: `r1-m${i}`,
         round: 1,
         matchIndex: i,
-        player1: players[i * 2].name,
-        player2: players[i * 2 + 1].name,
+        player1: layout ? layout.pairs[i][0].name : players[i * 2].name,
+        player2: layout ? layout.pairs[i][1].name : players[i * 2 + 1].name,
         winner: null,
         isPlayed: false,
         prevMatch1: null,
@@ -68,7 +72,15 @@ function generateSingleEliminationBracket(participants, max, winCondition) {
       let prev2 = null;
       let isBye = false;
 
-      if (r === firstRealRound) {
+      if (r === firstRealRound && layout) {
+        // Seeded: slots follow the standard seed order (1v{n} ... best seeds meet last).
+        const s1 = layout.slots[2 * i];
+        const s2 = layout.slots[2 * i + 1];
+        if (s1.prelim != null) prev1 = `r1-m${s1.prelim}`;
+        else p1 = s1.name;
+        if (s2.prelim != null) prev2 = `r1-m${s2.prelim}`;
+        else p2 = s2.name;
+      } else if (r === firstRealRound) {
         const slot1 = firstSlots[i];
         if (slot1 === "prelim") {
           const prelimIdx = allSlots.slice(0, 2 * i).filter(s => s === "prelim").length;
@@ -155,7 +167,8 @@ function propagateByeWinners(matches) {
 
 export function generateDoubleEliminationBracket(participants, max, winCondition) {
   const wc = winCondition || "ft3";
-  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  const seeded = hasSeeds(participants);
+  const shuffled = seeded ? [...participants].sort(bySeed) : [...participants].sort(() => Math.random() - 0.5);
   const numPlayers = Math.min(shuffled.length, max);
   const players = shuffled.slice(0, numPlayers);
   const matches = [];
@@ -165,6 +178,7 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
   const base = Math.pow(2, Math.floor(Math.log2(numPlayers)));
   const prelimCount = numPlayers - base;
   const hasPrelims = prelimCount > 0;
+  const layout = seeded ? seededFirstRound(players, base) : null;
   const firstRealWbRound = hasPrelims ? 2 : 1;
 
   // PHASE 1: Generate all Winners Bracket matches
@@ -175,8 +189,8 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
         bracket: 'winners',
         round: 1,
         matchIndex: i,
-        player1: players[i * 2].name,
-        player2: players[i * 2 + 1].name,
+        player1: layout ? layout.pairs[i][0].name : players[i * 2].name,
+        player2: layout ? layout.pairs[i][1].name : players[i * 2 + 1].name,
         winner: null,
         isPlayed: false,
         prevMatch1: null,
@@ -222,7 +236,15 @@ export function generateDoubleEliminationBracket(participants, max, winCondition
       let prev2 = null;
       let isBye = false;
 
-      if (r === firstRealWbRound) {
+      if (r === firstRealWbRound && layout) {
+        // Seeded: slots follow the standard seed order (1v{n} ... best seeds meet last).
+        const s1 = layout.slots[2 * i];
+        const s2 = layout.slots[2 * i + 1];
+        if (s1.prelim != null) prev1 = `wb-r1-m${s1.prelim}`;
+        else p1 = s1.name;
+        if (s2.prelim != null) prev2 = `wb-r1-m${s2.prelim}`;
+        else p2 = s2.name;
+      } else if (r === firstRealWbRound) {
         const slot1 = firstSlots[i];
         if (slot1 === "prelim") {
           const prelimIdx = allSlots.slice(0, 2 * i).filter(s => s === "prelim").length;

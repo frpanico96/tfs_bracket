@@ -6,6 +6,7 @@ import { getPositionGroups } from "../utils/positions";
 import { logEvent } from "../utils/logger";
 import { addNames, removeName, renameName } from "../utils/participants";
 import { getUserName } from "../utils/user";
+import { seedParticipants } from "../utils/seeding";
 import BracketView from "./BracketView";
 import TournamentSidebar from "./TournamentSidebar";
 import MatchScoreModal from "./MatchScoreModal";
@@ -36,11 +37,6 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const isDev = import.meta.env.DEV;
   const isFc = isFinalChampionship(t);
   const isAdmin = user?.uid && t?.adminId && user.uid === t.adminId;
-  const buildMatches = () => {
-    if (isFc) return generateFinalChampionshipBracket(t.participants, t.maxParticipants);
-    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
-    return bracketGen(t.participants, t.maxParticipants, t.defaultWinCondition || "ft3");
-  };
   const now = new Date();
   const regStartDate = parseFirestoreDate(t.regStart);
   const regEndDate = parseFirestoreDate(t.regEnd);
@@ -83,6 +79,28 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
   const [showEntries, setShowEntries] = useState(false);
   const [bracketLink, setBracketLink] = useState(null);
   const addToast = useToast();
+  // Participants ranked by their leaderboard score (users.score). If the scores can not
+  // be read the bracket is drawn randomly, as before.
+  const loadSeededParticipants = async () => {
+    try {
+      const snap = await getDocs(query(usersRef, where("score", ">", 0)));
+      if (!snap?.docs) throw new Error("no scores");
+      const scores = {};
+      snap.docs.forEach((d) => { scores[d.id] = d.data().score; });
+      return { participants: seedParticipants(t.participants, scores), seeded: true };
+    } catch {
+      addToast("Could not read the leaderboard, players were drawn randomly", "error");
+      return { participants: t.participants, seeded: false };
+    }
+  };
+  // -> { matches, seeded }. `seeded` is stored on the tournament so positions can be
+  // computed for the shape that was really generated.
+  const buildMatches = async () => {
+    const { participants, seeded } = await loadSeededParticipants();
+    if (isFc) return { matches: generateFinalChampionshipBracket(participants, t.maxParticipants), seeded };
+    const bracketGen = t.bracketType === "double" ? generateDoubleEliminationBracket : generateBracket;
+    return { matches: bracketGen(participants, t.maxParticipants, t.defaultWinCondition || "ft3"), seeded };
+  };
 
   const rawRankings = useMemo(
     () => t.matches ? computeRankings(t.matches, t.bracketType, t.rankScores, t.participants) : [],
@@ -186,14 +204,14 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
     if (!isAdmin) return;
     setStarting(true);
     try {
-      const matches = buildMatches();
+      const { matches, seeded } = await buildMatches();
       if (matches.length === 0) {
         addToast("At least two participants are needed to start", "error");
         return;
       }
       const ref = doc(db, "tournaments", t.id);
-      await updateDoc(ref, { matches, started: true });
-      onUpdate({ ...t, matches, started: true });
+      await updateDoc(ref, { matches, started: true, seeded });
+      onUpdate({ ...t, matches, started: true, seeded });
       logEvent({ action: "start_tournament", details: { tournamentId: t.id, adminId: user.uid, participantCount: t.participants.length, bracketType: t.bracketType } });
     } catch {
       addToast("Failed to start tournament", "error");
@@ -375,10 +393,10 @@ export default function TournamentDetail({ tournament, user, onBack, onUpdate, o
 
   const handleConfirmReset = async () => {
     if (!isAdmin) return;
-    const freshMatches = buildMatches();
+    const { matches: freshMatches, seeded } = await buildMatches();
     const ref = doc(db, "tournaments", t.id);
-    await updateDoc(ref, { matches: freshMatches });
-    onUpdate({ ...t, matches: freshMatches });
+    await updateDoc(ref, { matches: freshMatches, seeded });
+    onUpdate({ ...t, matches: freshMatches, seeded });
     logEvent({ action: "reset_bracket", details: { tournamentId: t.id, adminId: user.uid } });
     setShowResetConfirm(false);
   };

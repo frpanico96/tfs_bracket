@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { generateDoubleEliminationBracket, advanceBracket, computeRankings } from "../utils/bracket";
 import { generateFinalChampionshipBracket } from "../utils/finalChampionship";
+import { seedParticipants } from "../utils/seeding";
 import { getAvailablePositions, getPositionGroups } from "../utils/positions";
 
 function seeded(seed) {
@@ -113,7 +114,11 @@ describe("getAvailablePositions - Final Championship", () => {
 describe("positions are independent of the results", () => {
   const cases = [
     ["standard", (n) => generateDoubleEliminationBracket(mk(n), 64, "ft2"), (n) => dbl(mk(n))],
-    ["final championship", (n, seed) => generateFinalChampionshipBracket(mk(n - 4, 3, 1), 64, seeded(seed)), (n) => fc(mk(n - 4, 3, 1))],
+    // not started yet / seeded: the shape follows the seeded bracket
+    ["final championship (seeded)", (n, seed) => generateFinalChampionshipBracket(seedParticipants(mk(n - 4, 3, 1), {}, seeded(seed)), 64, seeded(seed)), (n) => fc(mk(n - 4, 3, 1))],
+    ["standard (seeded)", (n, seed) => generateDoubleEliminationBracket(seedParticipants(mk(n), {}, seeded(seed)), 64, "ft2"), (n) => dbl(mk(n))],
+    // started before seeding existed: unseeded shape is kept
+    ["final championship (legacy)", (n, seed) => generateFinalChampionshipBracket(mk(n - 4, 3, 1), 64, seeded(seed)), (n) => ({ ...fc(mk(n - 4, 3, 1)), started: true })],
   ];
   for (const [name, make, tournament] of cases) {
     it(`${name}: random playouts always end on the announced positions`, () => {

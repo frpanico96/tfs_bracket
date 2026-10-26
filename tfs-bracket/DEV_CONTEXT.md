@@ -474,3 +474,23 @@ Display only: the stored value stays `"TBD"`; a child `<small class="slot-hint">
 - `title` tooltip with the real names once the source match is known (`Loser of Ann vs Bob`). The lookup comes from a context in `BracketView`.
 - The hint is always visible now (it used to show in swap mode only); `feederLabel` was removed from `swap.js`. The grand final placeholder card also lists its two sources.
 - Tests: `lbMirrorAndHints.test.js`, updated `BracketViewSwapTbd.test.jsx` / `swap.test.js`.
+
+## Iteration 14: Seeding by leaderboard score
+
+### Rules
+- Seed = rank by total leaderboard score (`users.score`, read with the same query as the Leaderboard). Equal scores, players without an account and players without score are ordered randomly among themselves, below the scored players.
+- Applies to single elimination, double elimination and Final Championship regulars.
+- Standard / double: standard seed order (`standardOrder`): 8 players -> 1v8, 4v5, 2v7, 3v6, so top seeds meet last. Not a power of two: the best seeds get the byes into the first full round, the others play preliminaries best-vs-worst (20 players: top 12 byes, 13v20, 14v19, 15v18, 16v17); a preliminary winner takes the slot of the better seed of its match (seed 1 faces the 16v17 winner).
+- Final Championship: regulars that skip the preliminary round enter at round 2, so the "most advanced regular entry round" is 2 (1 when the regular field is a power of two). **Winners enter one round after that, Champions two rounds after that** (24 players = 20 regular + 2 winners + 2 champions: preliminaries round 1, bye seeds round 2, Winners round 3, Champions round 4). FC still uses no BYE placeholders. Rounds pair best seed vs worst seed of the pool (`pairSeeded`); an odd pool still defers one undecided winner.
+
+### Code
+- `utils/seeding.js`: `seedParticipants(participants, scores, rng)` (copies with `seed`), `standardOrder`, `seededFirstRound`, `hasSeeds`.
+- Generators seed **only when every participant has a numeric `seed`**; otherwise the old random draw runs unchanged (existing tests, callers and `Math.random` behaviour are identical).
+- `TournamentDetail`: start and reset read the scores (`loadSeededParticipants`) and store `seeded: true|false` on the tournament doc. If the leaderboard can not be read a toast is shown and the draw is random (`seeded: false`).
+- `positions.js`: measures the seeded shape unless the tournament was started without `seeded` (tournaments started before this change keep the old shape; only matters for Final Championship fields whose regulars are not a power of two).
+
+### Notes
+- Seeds are not persisted per player; they live in the generated bracket. Reset re-reads the scores, so a reset after a leaderboard change re-seeds.
+- Existing tournaments are untouched until reset.
+- Tests: `seeding.test.js`, `TournamentDetailSeeding.test.jsx`, seeded/legacy cases in `positions.test.js`.
+

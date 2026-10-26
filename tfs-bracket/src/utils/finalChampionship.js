@@ -1,3 +1,5 @@
+import { hasSeeds, bySeed } from "./seeding";
+
 // ── Constants ───────────────────────────────────────────────
 
 export const TOURNAMENT_TYPE_FC = "final_championship";
@@ -366,7 +368,50 @@ function pairItems(pool, rng) {
   return { pairs, deferred };
 }
 
-const LAST_ENTRY_ROUND = 3;
+// Seeded pairing: best seed vs worst seed of the pool (a "fold"), so higher seeds
+// get the easier opponents. An odd field still defers one undecided winner.
+function pairSeeded(pool) {
+  const items = [...pool];
+  let deferred = null;
+  if (items.length % 2 === 1) {
+    deferred = takeDeferred(items);
+    deferred = { ...deferred, byes: deferred.byes + 1 };
+  }
+  items.sort(bySeed);
+  const pairs = [];
+  for (let i = 0; i < Math.floor(items.length / 2); i++) pairs.push([items[i], items[items.length - 1 - i]]);
+  return { pairs, deferred };
+}
+
+// Entry rounds. Unseeded: regulars 1, Winners 2, Champions 3. Seeded: the best
+// regulars skip the preliminary round when the regular field is not a power of two,
+// so the most advanced regular entry round is 2 (otherwise 1); Winners enter one
+// round after that and Champions two rounds after that.
+function entryPlan(byTier, seeded) {
+  if (!seeded) {
+    return {
+      entrants: { 1: byTier.regular, 2: byTier.winner, 3: byTier.champion },
+      byesAt: (level) => level - 1,
+      lastEntry: 3,
+    };
+  }
+  const regs = [...byTier.regular].sort(bySeed);
+  const n = regs.length;
+  const base = n >= 2 ? Math.pow(2, Math.floor(Math.log2(n))) : n;
+  const prelims = n - base;
+  const entrants = {};
+  let top = 1;
+  if (prelims > 0) {
+    entrants[1] = regs.slice(base - prelims);
+    entrants[2] = regs.slice(0, base - prelims);
+    top = 2;
+  } else {
+    entrants[1] = regs;
+  }
+  entrants[top + 1] = byTier.winner;
+  entrants[top + 2] = byTier.champion;
+  return { entrants, byesAt: (level) => level - 1, lastEntry: top + 2 };
+}
 
 // Final Championship: double elimination where Winners enter one round and
 // Champions two rounds after the regular participants. Odd fields are balanced by
@@ -375,27 +420,29 @@ export function generateFinalChampionshipBracket(participants, max, rng = Math.r
   const players = participants.slice(0, max);
   const byTier = { regular: [], winner: [], champion: [] };
   for (const p of players) byTier[getTier(p)].push(p);
-  const entrants = {
-    1: shuffle(byTier.regular, rng),
-    2: shuffle(byTier.winner, rng),
-    3: shuffle(byTier.champion, rng),
-  };
-  const entryByes = { 1: 0, 2: 1, 3: 2 };
+  const seeded = hasSeeds(players);
+  const plan = seeded
+    ? entryPlan(byTier, true)
+    : entryPlan(
+        { regular: shuffle(byTier.regular, rng), winner: shuffle(byTier.winner, rng), champion: shuffle(byTier.champion, rng) },
+        false
+      );
+  const { entrants, byesAt, lastEntry } = plan;
 
   const matches = [];
   let carry = [];
   let roundNum = 0;
 
   for (let level = 1; ; level++) {
-    const direct = (entrants[level] || []).map((p) => ({ kind: "p", name: p.name, byes: entryByes[level] }));
+    const direct = (entrants[level] || []).map((p) => ({ kind: "p", name: p.name, seed: p.seed, byes: byesAt(level) }));
     const pool = [...carry, ...direct];
-    if (level >= LAST_ENTRY_ROUND && pool.length <= 1) break;
+    if (level >= lastEntry && pool.length <= 1) break;
 
     if (pool.length < 2) {
       carry = pool;
       continue;
     }
-    const { pairs, deferred } = pairItems(pool, rng);
+    const { pairs, deferred } = seeded ? pairSeeded(pool) : pairItems(pool, rng);
     const next = [];
     if (pairs.length > 0) roundNum++;
     pairs.forEach((pair, i) => {
@@ -416,7 +463,7 @@ export function generateFinalChampionshipBracket(participants, max, rng = Math.r
         scoreP1: 0,
         scoreP2: 0,
       });
-      next.push({ kind: "m", id, byes: 0 });
+      next.push({ kind: "m", id, byes: 0, seed: seeded ? Math.min(pair[0].seed, pair[1].seed) : undefined });
     });
     carry = deferred ? [...next, deferred] : next;
   }
